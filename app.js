@@ -20,7 +20,7 @@ const AVATAR_COLORS = [
 // ══════════════════════════════════════════════════
 
 const state = {
-  theme: 'light',
+  theme: localStorage.getItem('ru_theme') || 'light',
   view: 'overview',
 
   members: [],
@@ -30,6 +30,9 @@ const state = {
   projects: [],
 
   invoices: [],
+
+  channels: [],
+  activeChannel: null,
 
   // UI flags
   addingTaskTo:  null,
@@ -129,6 +132,7 @@ function todayISO() {
 
 function applyTheme(theme) {
   state.theme = theme;
+  localStorage.setItem('ru_theme', theme);
   document.documentElement.setAttribute('data-theme', theme);
   const btn = document.getElementById('theme-btn');
   if (!btn) return;
@@ -330,10 +334,12 @@ async function initApp() {
   applyTheme(state.theme);
   try {
     const data = await api('/api/data');
-    state.projects = data.projects;
-    state.meetings = data.meetings;
-    state.invoices = data.invoices;
-    state.members  = data.members;
+    state.projects  = data.projects;
+    state.meetings  = data.meetings;
+    state.invoices  = data.invoices;
+    state.members   = data.members;
+    state.channels  = data.channels || [];
+    state.activeChannel = state.channels[0]?.id || null;
   } catch (e) {
     console.error('Failed to load data:', e);
   }
@@ -406,19 +412,20 @@ function renderView() {
     overview: renderOverview,
     projects: renderProjects,
     meetings: renderMeetings,
-    invoices: renderInvoices,
-    members:  renderMembers,
+    invoices:    renderInvoices,
+    members:     renderMembers,
+    statistics:  renderStatistics,
   };
   wrap.innerHTML = (views[state.view] || renderOverview)();
   afterRender();
 }
 
 function afterRender() {
-  // Focus inline inputs if present
   const ti = document.querySelector('.add-task-input');
   if (ti) ti.focus();
   const ii = document.querySelector('.add-item-input');
   if (ii) ii.focus();
+  if (state.view === 'statistics') initCharts();
 }
 
 // ══════════════════════════════════════════════════
@@ -434,6 +441,121 @@ function renderTeamList() {
       <span class="team-member-name">${m.name.split(' ')[0]}</span>
     </div>
   `).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  STATISTICS PAGE
+// ══════════════════════════════════════════════════
+
+function renderStatistics() {
+  const channels = state.channels;
+  const activeId = state.activeChannel;
+  const active = channels.find(c => c.id === activeId) || channels[0] || null;
+
+  return `
+    <div class="page-header">
+      <div class="page-title-block">
+        <h1 class="page-title">Statistics</h1>
+      </div>
+      <button class="btn-primary btn-sm" data-action="new-channel">+ New Channel</button>
+    </div>
+
+    ${channels.length === 0
+      ? `<div class="empty-state"><div class="empty-state-icon">📊</div><p class="empty-state-text">No channels yet. Create one to start tracking statistics.</p></div>`
+      : `
+        <div class="channel-tabs">
+          ${channels.map(c => `
+            <button class="channel-tab ${c.id === (active?.id) ? 'active' : ''}" data-action="select-channel" data-channel-id="${c.id}">
+              ${c.name}
+              <span class="channel-tab-close" data-action="delete-channel" data-channel-id="${c.id}">✕</span>
+            </button>
+          `).join('')}
+        </div>
+        ${active ? renderChannelContent(active) : ''}
+      `
+    }
+  `;
+}
+
+function renderChannelContent(channel) {
+  return `
+    <div class="channel-content">
+      <div class="channel-content-header">
+        <span class="channel-content-title">${channel.name}</span>
+        <button class="btn-ghost btn-sm" data-action="new-chart" data-channel-id="${channel.id}">+ Add Chart</button>
+      </div>
+      ${channel.charts.length === 0
+        ? `<div class="empty-state"><div class="empty-state-icon">📈</div><p class="empty-state-text">No charts yet. Add one to visualize your data.</p></div>`
+        : `<div class="charts-grid">${channel.charts.map(ch => renderChartCard(ch, channel.id)).join('')}</div>`
+      }
+    </div>
+  `;
+}
+
+function renderChartCard(chart, channelId) {
+  return `
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <span class="chart-card-title">${chart.title}</span>
+        <button class="delete-btn" data-action="delete-chart" data-channel-id="${channelId}" data-chart-id="${chart.id}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="chart-${chart.id}" data-chart-id="${chart.id}" data-chart-type="${chart.chartType}"></canvas>
+      </div>
+    </div>
+  `;
+}
+
+function initCharts() {
+  if (typeof Chart === 'undefined') return;
+  const PALETTE = ['#6366f1','#ec4899','#14b8a6','#f59e0b','#8b5cf6','#0ea5e9','#ef4444','#10b981','#f97316','#3b82f6'];
+
+  document.querySelectorAll('canvas[data-chart-id]').forEach(canvas => {
+    const chartId = canvas.dataset.chartId;
+    let chartData = null;
+    for (const ch of state.channels) {
+      chartData = ch.charts.find(c => c.id === chartId);
+      if (chartData) break;
+    }
+    if (!chartData || !chartData.data.length) return;
+
+    const labels = chartData.data.map(d => d.label);
+    const values = chartData.data.map(d => d.value);
+    const type = chartData.chartType || 'bar';
+    const isRound = type === 'pie' || type === 'doughnut';
+
+    new Chart(canvas, {
+      type,
+      data: {
+        labels,
+        datasets: [{
+          label: chartData.title,
+          data: values,
+          backgroundColor: isRound
+            ? labels.map((_, i) => PALETTE[i % PALETTE.length])
+            : type === 'line' ? 'rgba(99,102,241,0.1)' : PALETTE[0],
+          borderColor: isRound
+            ? labels.map((_, i) => PALETTE[i % PALETTE.length])
+            : type === 'line' ? '#6366f1' : PALETTE[0],
+          borderWidth: 2,
+          tension: 0.4,
+          fill: type === 'line',
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: isRound, position: 'bottom' } },
+        scales: isRound ? {} : {
+          y: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.1)' } },
+          x: { grid: { display: false } },
+        },
+      },
+    });
+  });
 }
 
 // ══════════════════════════════════════════════════
@@ -869,8 +991,10 @@ async function handleMainClick(e) {
   const pid   = el.dataset.projectId  || null;
   const tid   = el.dataset.taskId     || null;
   const mid   = el.dataset.meetingId  || null;
-  const iid   = el.dataset.itemId     || null;
-  const invId = el.dataset.invoiceId  || null;
+  const iid    = el.dataset.itemId     || null;
+  const invId  = el.dataset.invoiceId  || null;
+  const chanId = el.dataset.channelId  || null;
+  const chartId = el.dataset.chartId   || null;
 
   switch (action) {
 
@@ -1095,6 +1219,46 @@ async function handleMainClick(e) {
         renderTeamList();
         renderView();
         api('/api/members', 'DELETE', { id: memberId }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'new-channel': {
+      openNewChannelModal();
+      break;
+    }
+
+    case 'select-channel': {
+      state.activeChannel = chanId;
+      renderView();
+      break;
+    }
+
+    case 'delete-channel': {
+      const ch = state.channels.find(c => c.id === chanId);
+      if (!ch) return;
+      openDeleteConfirm(`Delete channel "${ch.name}" and all its charts?`, async () => {
+        state.channels = state.channels.filter(c => c.id !== chanId);
+        if (state.activeChannel === chanId) state.activeChannel = state.channels[0]?.id || null;
+        renderView();
+        api('/api/channels', 'DELETE', { id: chanId }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'new-chart': {
+      openNewChartModal(chanId);
+      break;
+    }
+
+    case 'delete-chart': {
+      const chartChannel = state.channels.find(c => c.id === chanId);
+      const chart = chartChannel?.charts.find(c => c.id === chartId);
+      if (!chart) return;
+      openDeleteConfirm(`Delete chart "${chart.title}"?`, async () => {
+        chartChannel.charts = chartChannel.charts.filter(c => c.id !== chartId);
+        renderView();
+        api('/api/charts', 'DELETE', { id: chartId }).catch(console.error);
       });
       break;
     }
@@ -1590,10 +1754,143 @@ async function confirmNewMeeting() {
   navigate('meetings');
 }
 
+// ── New Channel Modal ─────────────────────────────
+
+function openNewChannelModal() {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">New Channel</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Channel Name</label>
+        <input type="text" class="form-input" id="chan-name" placeholder="e.g. Financial Overview" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmNewChannel()">Create Channel</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('chan-name')?.focus(), 50);
+}
+
+async function confirmNewChannel() {
+  const name = document.getElementById('chan-name')?.value.trim();
+  if (!name) {
+    const el = document.getElementById('chan-name');
+    if (el) el.style.borderColor = 'var(--urgent)';
+    return;
+  }
+  try {
+    const channel = await api('/api/channels', 'POST', { name });
+    state.channels.push(channel);
+    state.activeChannel = channel.id;
+  } catch (e) { console.error(e); return; }
+  closeModal();
+  renderView();
+}
+
+// ── New Chart Modal ───────────────────────────────
+
+let _pendingChartRows = [{ label: '', value: '' }];
+
+function openNewChartModal(channelId) {
+  _pendingChartRows = [{ label: '', value: '' }];
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Add Chart</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Chart Title</label>
+        <input type="text" class="form-input" id="chart-title" placeholder="e.g. Monthly Revenue" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Chart Type</label>
+        <select class="form-select" id="chart-type">
+          <option value="bar">Bar</option>
+          <option value="line">Line</option>
+          <option value="pie">Pie</option>
+          <option value="doughnut">Doughnut</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Data</label>
+        <div class="chart-rows-header">
+          <span>Label</span><span>Value</span>
+        </div>
+        <div id="chart-rows"></div>
+        <button class="btn-ghost btn-sm" style="margin-top:8px" onclick="addChartRow('${channelId}')">+ Add Row</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmNewChart('${channelId}')">Create Chart</button>
+    </div>
+  `);
+  renderModalChartRows(channelId);
+  setTimeout(() => document.getElementById('chart-title')?.focus(), 50);
+}
+
+function renderModalChartRows(channelId) {
+  const el = document.getElementById('chart-rows');
+  if (!el) return;
+  el.innerHTML = _pendingChartRows.map((row, i) => `
+    <div class="chart-row-item">
+      <input type="text" class="form-input chart-row-label" placeholder="Label" value="${row.label}"
+             oninput="_pendingChartRows[${i}].label = this.value" />
+      <input type="number" class="form-input chart-row-value" placeholder="0" value="${row.value}"
+             oninput="_pendingChartRows[${i}].value = this.value" />
+      ${_pendingChartRows.length > 1
+        ? `<button class="btn-ghost btn-icon" onclick="removeChartRow(${i}, '${channelId}')">✕</button>`
+        : `<span style="width:32px"></span>`}
+    </div>
+  `).join('');
+}
+
+function addChartRow(channelId) {
+  _pendingChartRows.push({ label: '', value: '' });
+  renderModalChartRows(channelId);
+}
+
+function removeChartRow(i, channelId) {
+  _pendingChartRows.splice(i, 1);
+  renderModalChartRows(channelId);
+}
+
+async function confirmNewChart(channelId) {
+  const title     = document.getElementById('chart-title')?.value.trim();
+  const chartType = document.getElementById('chart-type')?.value;
+
+  if (!title) {
+    const el = document.getElementById('chart-title');
+    if (el) el.style.borderColor = 'var(--urgent)';
+    return;
+  }
+
+  const rows = _pendingChartRows.filter(r => r.label.trim() && r.value !== '');
+  if (!rows.length) return;
+
+  const data = rows.map(r => ({ label: r.label.trim(), value: parseFloat(r.value) || 0 }));
+
+  try {
+    const chart = await api('/api/charts', 'POST', { channelId, title, chartType, data });
+    const channel = state.channels.find(c => c.id === channelId);
+    if (channel) channel.charts.push(chart);
+  } catch (e) { console.error(e); return; }
+
+  closeModal();
+  renderView();
+}
+
 // ══════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
+  applyTheme(state.theme);
   initAuth();
 });

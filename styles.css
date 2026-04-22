@@ -1447,3 +1447,150 @@ tr:hover .delete-btn,
 @keyframes authFadeOut {
   to { opacity: 0; transform: scale(0.98); }
 }
+
+/* ══════════════════════════════════════════════════
+   STATISTICS — CHANNELS & CHARTS
+══════════════════════════════════════════════════ */
+
+.channel-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.channel-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  cursor: pointer;
+  transition: background var(--trans), border-color var(--trans), color var(--trans);
+}
+
+.channel-tab:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.channel-tab.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+.channel-tab-close {
+  font-size: 11px;
+  opacity: 0.5;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: opacity var(--trans);
+}
+
+.channel-tab:hover .channel-tab-close,
+.channel-tab.active .channel-tab-close {
+  opacity: 0.9;
+}
+
+.channel-content {
+  min-height: 200px;
+}
+
+.channel-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.channel-content-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.chart-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--trans);
+}
+
+.chart-card:hover {
+  box-shadow: var(--shadow);
+}
+
+.chart-card:hover .delete-btn {
+  opacity: 1;
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.chart-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  height: 220px;
+}
+
+/* Chart modal data rows */
+.chart-rows-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 32px;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.chart-row-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.chart-row-item .form-input {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
