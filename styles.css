@@ -544,6 +544,49 @@ body {
 
 .btn-full { width: 100%; justify-content: center; }
 
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  transition: opacity var(--trans);
+}
+.btn-danger:hover { opacity: 0.85; }
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+tr:hover .delete-btn,
+.agenda-item:hover .delete-btn,
+.project-group-header:hover .delete-btn,
+.meeting-header:hover .delete-btn { opacity: 1; }
+.delete-btn:hover { color: #ef4444; }
+
+.member-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+}
+.member-card { position: relative; }
+.member-card:hover .member-delete-btn { opacity: 1; }
+
 .btn-sm {
   padding: 6px 12px;
   font-size: 12px;

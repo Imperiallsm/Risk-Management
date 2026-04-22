@@ -578,6 +578,9 @@ function renderProjectGroup(project) {
               data-task-id="${t.id}">${t.status}</span>
       </td>
       <td class="text-muted text-sm">${formatDateShort(t.dueDate)}</td>
+      <td style="width:32px;text-align:right">
+        <button class="delete-btn" data-action="delete-task" data-project-id="${project.id}" data-task-id="${t.id}" title="Delete task">×</button>
+      </td>
     </tr>
   `).join('');
 
@@ -611,7 +614,10 @@ function renderProjectGroup(project) {
     <div class="project-group">
       <div class="project-group-header">
         <span class="project-group-name">${project.name}</span>
-        <span class="project-count">${project.tasks.length} task${project.tasks.length !== 1 ? 's' : ''}</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="project-count">${project.tasks.length} task${project.tasks.length !== 1 ? 's' : ''}</span>
+          <button class="delete-btn" data-action="delete-project" data-project-id="${project.id}" title="Delete project">×</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table class="data-table">
@@ -674,6 +680,7 @@ function renderMeetingCard(meeting) {
              data-item-id="${item.id}"></div>
         <span class="agenda-item-name ${item.done ? 'done' : ''}">${item.name}</span>
         ${deadlineBadge}
+        <button class="delete-btn" data-action="delete-item" data-meeting-id="${meeting.id}" data-item-id="${item.id}" title="Delete item">×</button>
         <div class="timeline-toggle ${item.hasTimeline ? 'has-timeline' : ''}"
              data-action="toggle-timeline"
              data-meeting-id="${meeting.id}"
@@ -711,7 +718,10 @@ function renderMeetingCard(meeting) {
           <span class="meeting-title">${meeting.title}</span>
           <span class="meeting-date-chip">${formatDateShort(meeting.date)}</span>
         </div>
-        <span class="meeting-item-count">${doneCount}/${meeting.items.length} done</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="meeting-item-count">${doneCount}/${meeting.items.length} done</span>
+          <button class="delete-btn" data-action="delete-meeting" data-meeting-id="${meeting.id}" title="Delete meeting">×</button>
+        </div>
       </div>
       <div class="meeting-body ${meeting.expanded ? 'open' : ''}">
         ${meeting.items.length === 0 && !isAdding
@@ -752,6 +762,9 @@ function renderInvoices() {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           ${inv.attachments.length > 0 ? inv.attachments.length : 'Attach'}
         </button>
+      </td>
+      <td style="width:32px">
+        <button class="delete-btn" data-action="delete-invoice" data-invoice-id="${inv.id}" title="Delete invoice">×</button>
       </td>
     </tr>
   `).join('');
@@ -814,6 +827,7 @@ function renderInvoices() {
 function renderMembers() {
   const cards = state.members.map(m => `
     <div class="member-card">
+      <button class="delete-btn member-delete-btn" data-action="delete-member" data-member-id="${m.id}" title="Remove member">×</button>
       <div class="member-avatar" style="background:${getAvatarColor(m.name)}">${getInitials(m.name)}</div>
       <div class="member-name">${m.name}</div>
       <div class="member-role-pill">${m.role}</div>
@@ -1010,6 +1024,76 @@ async function handleMainClick(e) {
       openNewProjectModal();
       break;
     }
+
+    case 'delete-task': {
+      const proj = state.projects.find(p => p.id === pid);
+      const task = proj?.tasks.find(t => t.id === tid);
+      if (!task) return;
+      openDeleteConfirm(`Delete task "${task.name}"?`, async () => {
+        proj.tasks = proj.tasks.filter(t => t.id !== tid);
+        renderView();
+        api('/api/tasks', 'DELETE', { id: tid }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'delete-project': {
+      const proj = state.projects.find(p => p.id === pid);
+      if (!proj) return;
+      openDeleteConfirm(`Delete project "${proj.name}" and all its tasks?`, async () => {
+        state.projects = state.projects.filter(p => p.id !== pid);
+        renderView();
+        api('/api/projects', 'DELETE', { id: pid }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'delete-meeting': {
+      const meeting = state.meetings.find(m => m.id === mid);
+      if (!meeting) return;
+      openDeleteConfirm(`Delete meeting "${meeting.title}"?`, async () => {
+        state.meetings = state.meetings.filter(m => m.id !== mid);
+        renderView();
+        api('/api/meetings', 'DELETE', { id: mid }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'delete-item': {
+      const meeting = state.meetings.find(m => m.id === mid);
+      const item = meeting?.items.find(i => i.id === iid);
+      if (!item) return;
+      openDeleteConfirm(`Delete item "${item.name}"?`, async () => {
+        meeting.items = meeting.items.filter(i => i.id !== iid);
+        renderView();
+        api('/api/items', 'DELETE', { id: iid }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'delete-invoice': {
+      const inv = state.invoices.find(i => i.id === invId);
+      if (!inv) return;
+      openDeleteConfirm(`Delete invoice for "${inv.recipient}"?`, async () => {
+        state.invoices = state.invoices.filter(i => i.id !== invId);
+        renderView();
+        api('/api/invoices', 'DELETE', { id: invId }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'delete-member': {
+      const memberId = el.dataset.memberId || null;
+      const member = state.members.find(m => m.id === memberId);
+      if (!member) return;
+      openDeleteConfirm(`Remove member "${member.name}"?`, async () => {
+        state.members = state.members.filter(m => m.id !== memberId);
+        renderTeamList();
+        renderView();
+        api('/api/members', 'DELETE', { id: memberId }).catch(console.error);
+      });
+      break;
+    }
   }
 }
 
@@ -1083,6 +1167,33 @@ function openModal(html) {
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
   state.pendingFiles = [];
+}
+
+// ── Delete Confirmation Modal ─────────────────────
+
+let _pendingDelete = null;
+
+function openDeleteConfirm(message, fn) {
+  _pendingDelete = fn;
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Confirm Delete</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--text-2);margin:0">${message}</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-danger" onclick="executePendingDelete()">Delete</button>
+    </div>
+  `);
+}
+
+function executePendingDelete() {
+  if (_pendingDelete) _pendingDelete();
+  _pendingDelete = null;
+  closeModal();
 }
 
 // ── Timeline / Deadline Modal ─────────────────────

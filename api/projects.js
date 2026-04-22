@@ -12,5 +12,13 @@ module.exports = async (req, res) => {
     return res.status(200).json({ id: data.id, name: data.name, tasks: [] });
   }
 
+  if (req.method === 'DELETE') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const { error } = await sb.from('projects').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true });
+  }
+
   return res.status(405).end();
 };
