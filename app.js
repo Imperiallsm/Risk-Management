@@ -304,13 +304,9 @@ async function checkOTPComplete(boxes) {
 
 function enterApp() {
   const authScreen = document.getElementById('auth-screen');
-  const app = document.getElementById('app');
-
   authScreen.classList.add('auth-exit');
   setTimeout(() => {
     authScreen.style.display = 'none';
-    app.classList.remove('app-hidden');
-    app.classList.add('app-visible');
     initApp();
   }, 280);
 }
@@ -343,6 +339,9 @@ async function initApp() {
   } catch (e) {
     console.error('Failed to load data:', e);
   }
+  const app = document.getElementById('app');
+  app.classList.remove('app-hidden');
+  app.classList.add('app-visible');
   renderTeamList();
   navigate('overview', true);
   bindAppEvents();
