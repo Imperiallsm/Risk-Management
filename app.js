@@ -204,7 +204,10 @@ async function checkEmail() {
     });
 
     if (!res.ok) {
-      error.textContent = 'Access denied — email not recognized.';
+      const body = await res.json().catch(() => ({}));
+      error.textContent = res.status === 403
+        ? 'Access denied — email not recognized.'
+        : (body.error || 'Something went wrong. Try again.');
       error.classList.add('show');
       input.style.borderColor = 'var(--urgent)';
       input.focus();

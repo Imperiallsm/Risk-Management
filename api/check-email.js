@@ -40,8 +40,8 @@ module.exports = async (req, res) => {
   });
 
   if (error) {
-    console.error('Supabase OTP error:', error.message);
-    return res.status(500).json({ error: 'Failed to send code. Try again.' });
+    console.error('Supabase OTP error:', error.message, '| status:', error.status, '| email:', normalized);
+    return res.status(500).json({ error: error.message });
   }
 
   return res.status(200).json({ success: true });
