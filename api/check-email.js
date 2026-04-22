@@ -2,7 +2,11 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
-const ADMIN_EMAIL = 'alverzalexander0@gmail.com';
+const ALWAYS_ALLOWED = new Set([
+  'alverzalexander0@gmail.com',
+  'riskimperialist@gmail.com',
+  'saltbear1project.rt@gmail.com',
+]);
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,8 +23,8 @@ module.exports = async (req, res) => {
 
   const normalized = email.trim().toLowerCase();
 
-  // Admin is always authorized
-  if (normalized !== ADMIN_EMAIL) {
+  // Hardcoded always-allowed emails
+  if (!ALWAYS_ALLOWED.has(normalized)) {
     // Everyone else must be in the members table (invited by admin)
     const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const { data } = await sb.from('members').select('id').eq('email', normalized).maybeSingle();
