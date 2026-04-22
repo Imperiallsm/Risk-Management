@@ -546,8 +546,15 @@ function renderProjects() {
       <div class="page-title-block">
         <h1 class="page-title">Projects</h1>
       </div>
+      <button class="btn-primary" data-action="new-project">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Project
+      </button>
     </div>
-    ${state.projects.map(renderProjectGroup).join('')}
+    ${state.projects.length === 0
+      ? `<div class="empty-state"><div class="empty-state-icon">📁</div><p class="empty-state-text">No projects yet. Create one to get started.</p></div>`
+      : state.projects.map(renderProjectGroup).join('')
+    }
   `;
 }
 
@@ -998,6 +1005,11 @@ async function handleMainClick(e) {
       openInviteModal();
       break;
     }
+
+    case 'new-project': {
+      openNewProjectModal();
+      break;
+    }
   }
 }
 
@@ -1368,6 +1380,43 @@ async function confirmInvite() {
 
   closeModal();
   renderTeamList();
+  renderView();
+}
+
+// ── New Project Modal ─────────────────────────────
+
+function openNewProjectModal() {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">New Project</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Project Name</label>
+        <input type="text" class="form-input" id="proj-name" placeholder="e.g. Risk Assessment Platform" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmNewProject()">Create Project</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('proj-name')?.focus(), 50);
+}
+
+async function confirmNewProject() {
+  const name = document.getElementById('proj-name')?.value.trim();
+  if (!name) {
+    const el = document.getElementById('proj-name');
+    if (el) el.style.borderColor = 'var(--urgent)';
+    return;
+  }
+  try {
+    const project = await api('/api/projects', 'POST', { name });
+    state.projects.push(project);
+  } catch (e) { console.error(e); return; }
+  closeModal();
   renderView();
 }
 

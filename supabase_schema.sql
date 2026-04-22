@@ -1,3 +1,12 @@
+-- Drop existing tables (safe to re-run)
+drop table if exists meeting_items cascade;
+drop table if exists project_tasks cascade;
+drop table if exists meetings cascade;
+drop table if exists projects cascade;
+drop table if exists invoices cascade;
+drop table if exists members cascade;
+
+-- Recreate
 create table projects (
   id uuid default gen_random_uuid() primary key,
   name text not null,
