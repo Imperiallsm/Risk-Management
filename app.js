@@ -321,7 +321,7 @@ function initOTP() {
 
   row.addEventListener('paste', e => {
     e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+    const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,8);
     const boxes = [...row.querySelectorAll('.otp-box')];
     text.split('').forEach((ch, i) => { if (boxes[i]) boxes[i].value = ch; });
     const next = boxes[Math.min(text.length, boxes.length - 1)];
@@ -332,7 +332,7 @@ function initOTP() {
 
 async function checkOTPComplete(boxes) {
   const code = boxes.map(b => b.value).join('');
-  if (code.length !== 6 || !/^\d{6}$/.test(code)) return;
+  if (code.length !== 8 || !/^\d{8}$/.test(code)) return;
 
   boxes.forEach(b => { b.disabled = true; });
   const hint = document.querySelector('.auth-hint');
