@@ -23,80 +23,18 @@ const state = {
   theme: 'light',
   view: 'overview',
 
-  members: [
-    { id: 1, name: 'Alexander Alverz',  email: 'alverzalexander0@gmail.com', role: 'Admin',  joinDate: '2024-01-15' },
-    { id: 2, name: 'Sarah Mitchell',    email: 'sarah@riskuniversalis.com',   role: 'Editor', joinDate: '2024-02-20' },
-    { id: 3, name: 'James Chen',        email: 'james@riskuniversalis.com',   role: 'Member', joinDate: '2024-03-10' },
-    { id: 4, name: 'Priya Rajan',       email: 'priya@riskuniversalis.com',   role: 'Viewer', joinDate: '2024-04-01' },
-  ],
+  members: [],
 
-  meetings: [
-    {
-      id: 1, title: 'Q2 Strategy Review', date: '2026-04-18', expanded: true,
-      items: [
-        { id: 1, name: 'Define market expansion targets',        done: false, hasTimeline: true,  deadline: '2026-04-23' },
-        { id: 2, name: 'Review competitive landscape analysis',  done: true,  hasTimeline: false, deadline: null },
-        { id: 3, name: 'Align on budget allocations',           done: false, hasTimeline: true,  deadline: '2026-04-28' },
-      ],
-    },
-    {
-      id: 2, title: 'Product Roadmap Planning', date: '2026-04-15', expanded: false,
-      items: [
-        { id: 4, name: 'Finalize feature prioritization matrix', done: false, hasTimeline: true,  deadline: '2026-04-22' },
-        { id: 5, name: 'Technical debt assessment',              done: false, hasTimeline: false, deadline: null },
-        { id: 6, name: 'Submit compliance documentation',        done: false, hasTimeline: true,  deadline: '2026-05-10' },
-      ],
-    },
-    {
-      id: 3, title: 'Client Onboarding Sync', date: '2026-04-10', expanded: false,
-      items: [
-        { id: 7, name: 'Send welcome packet to new clients',   done: true,  hasTimeline: false, deadline: null },
-        { id: 8, name: 'Schedule kickoff call for Q2 cohort', done: false, hasTimeline: false, deadline: null },
-      ],
-    },
-  ],
+  meetings: [],
 
-  projects: [
-    {
-      id: 1, name: 'Risk Assessment Platform',
-      tasks: [
-        { id: 1,  name: 'Design system audit',           status: 'Done',        dueDate: '2026-04-10', done: true  },
-        { id: 2,  name: 'API endpoint documentation',    status: 'In Progress', dueDate: '2026-04-25', done: false },
-        { id: 3,  name: 'User authentication flow',      status: 'Review',      dueDate: '2026-04-22', done: false },
-        { id: 4,  name: 'Database schema migration',     status: 'Stuck',       dueDate: '2026-04-20', done: false },
-      ],
-    },
-    {
-      id: 2, name: 'Compliance Dashboard',
-      tasks: [
-        { id: 5,  name: 'SOC 2 gap analysis',            status: 'In Progress', dueDate: '2026-04-30', done: false },
-        { id: 6,  name: 'Policy documentation update',   status: 'To Do',       dueDate: '2026-05-05', done: false },
-        { id: 7,  name: 'Control testing framework',     status: 'To Do',       dueDate: '2026-05-12', done: false },
-      ],
-    },
-    {
-      id: 3, name: 'Client Portal',
-      tasks: [
-        { id: 8,  name: 'Landing page redesign',         status: 'Done',        dueDate: '2026-04-08', done: true  },
-        { id: 9,  name: 'Invoice management module',     status: 'In Progress', dueDate: '2026-04-28', done: false },
-        { id: 10, name: 'Notification system',           status: 'To Do',       dueDate: '2026-05-15', done: false },
-      ],
-    },
-  ],
+  projects: [],
 
-  invoices: [
-    { id: 1, recipient: 'Nexora Finance Ltd.',      amount: 12500, reason: 'Q2 Risk Consulting Services',       date: '2026-04-01', status: 'Paid',    attachments: [] },
-    { id: 2, recipient: 'Meridian Group',           amount: 8750,  reason: 'Compliance Audit Support',          date: '2026-04-10', status: 'Pending', attachments: [] },
-    { id: 3, recipient: 'Stackline Technologies',   amount: 4200,  reason: 'Security Assessment — Phase 1',     date: '2026-03-15', status: 'Overdue', attachments: [] },
-    { id: 4, recipient: 'Atlas Insurance',          amount: 6800,  reason: 'Annual Risk Framework Review',      date: '2026-04-18', status: 'Paid',    attachments: [] },
-  ],
+  invoices: [],
 
   // UI flags
   addingTaskTo:  null,
   addingItemTo:  null,
   pendingFiles:  [],
-
-  nextIds: { member: 5, meeting: 4, task: 11, item: 9, invoice: 5 },
 };
 
 // ══════════════════════════════════════════════════
@@ -377,8 +315,28 @@ function enterApp() {
 //  APP INIT
 // ══════════════════════════════════════════════════
 
-function initApp() {
+async function api(path, method = 'GET', body = null) {
+  const session = getStoredSession();
+  const headers = { 'Content-Type': 'application/json' };
+  if (session) headers['Authorization'] = `Bearer ${session.access_token}`;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(`${method} ${path} → ${res.status}`);
+  return res.json();
+}
+
+async function initApp() {
   applyTheme(state.theme);
+  try {
+    const data = await api('/api/data');
+    state.projects = data.projects;
+    state.meetings = data.meetings;
+    state.invoices = data.invoices;
+    state.members  = data.members;
+  } catch (e) {
+    console.error('Failed to load data:', e);
+  }
   renderTeamList();
   navigate('overview', true);
   bindAppEvents();
@@ -878,16 +836,16 @@ function renderMembers() {
 //  EVENT HANDLING
 // ══════════════════════════════════════════════════
 
-function handleMainClick(e) {
+async function handleMainClick(e) {
   const el = e.target.closest('[data-action]');
   if (!el) return;
 
   const action = el.dataset.action;
-  const pid  = el.dataset.projectId  ? parseInt(el.dataset.projectId)  : null;
-  const tid  = el.dataset.taskId     ? parseInt(el.dataset.taskId)      : null;
-  const mid  = el.dataset.meetingId  ? parseInt(el.dataset.meetingId)   : null;
-  const iid  = el.dataset.itemId     ? parseInt(el.dataset.itemId)      : null;
-  const invId = el.dataset.invoiceId ? parseInt(el.dataset.invoiceId)   : null;
+  const pid   = el.dataset.projectId  || null;
+  const tid   = el.dataset.taskId     || null;
+  const mid   = el.dataset.meetingId  || null;
+  const iid   = el.dataset.itemId     || null;
+  const invId = el.dataset.invoiceId  || null;
 
   switch (action) {
 
@@ -899,6 +857,7 @@ function handleMainClick(e) {
         task.done = !task.done;
         if (task.done) task.status = 'Done';
         renderView();
+        api('/api/tasks', 'PATCH', { id: tid, done: task.done, status: task.status }).catch(console.error);
       }
       break;
     }
@@ -911,6 +870,7 @@ function handleMainClick(e) {
         task.status = nextStatus(task.status, STATUS_CYCLE);
         task.done = task.status === 'Done';
         renderView();
+        api('/api/tasks', 'PATCH', { id: tid, done: task.done, status: task.status }).catch(console.error);
       }
       break;
     }
@@ -928,13 +888,10 @@ function handleMainClick(e) {
       if (!name) { if (nameEl) nameEl.focus(); return; }
       const proj = state.projects.find(p => p.id === pid);
       if (proj) {
-        proj.tasks.push({
-          id: state.nextIds.task++,
-          name,
-          status: 'To Do',
-          dueDate: dateEl?.value || null,
-          done: false,
-        });
+        try {
+          const task = await api('/api/tasks', 'POST', { projectId: pid, name, dueDate: dateEl?.value || null });
+          proj.tasks.push(task);
+        } catch (e) { console.error(e); }
       }
       state.addingTaskTo = null;
       renderView();
@@ -959,7 +916,11 @@ function handleMainClick(e) {
     case 'toggle-meeting-item': {
       const meeting = state.meetings.find(m => m.id === mid);
       const item = meeting?.items.find(i => i.id === iid);
-      if (item) { item.done = !item.done; renderView(); }
+      if (item) {
+        item.done = !item.done;
+        renderView();
+        api('/api/items', 'PATCH', { id: iid, done: item.done }).catch(console.error);
+      }
       break;
     }
 
@@ -971,6 +932,7 @@ function handleMainClick(e) {
         item.hasTimeline = false;
         item.deadline = null;
         renderView();
+        api('/api/items', 'PATCH', { id: iid, hasTimeline: false, deadline: null }).catch(console.error);
       } else {
         openTimelineModal(mid, iid);
       }
@@ -996,7 +958,10 @@ function handleMainClick(e) {
       if (!name) { if (nameEl) nameEl.focus(); return; }
       const meeting = state.meetings.find(m => m.id === mid);
       if (meeting) {
-        meeting.items.push({ id: state.nextIds.item++, name, done: false, hasTimeline: false, deadline: null });
+        try {
+          const item = await api('/api/items', 'POST', { meetingId: mid, name });
+          meeting.items.push(item);
+        } catch (e) { console.error(e); }
       }
       state.addingItemTo = null;
       renderView();
@@ -1011,7 +976,11 @@ function handleMainClick(e) {
 
     case 'cycle-invoice-status': {
       const inv = state.invoices.find(i => i.id === invId);
-      if (inv) { inv.status = nextStatus(inv.status, INVOICE_STATUS_CYCLE); renderView(); }
+      if (inv) {
+        inv.status = nextStatus(inv.status, INVOICE_STATUS_CYCLE);
+        renderView();
+        api('/api/invoices', 'PATCH', { id: invId, status: inv.status }).catch(console.error);
+      }
       break;
     }
 
@@ -1054,11 +1023,8 @@ document.addEventListener('keydown', e => {
 });
 
 function simulateAction(action, data) {
-  const fakeEl = { dataset: { action, ...Object.fromEntries(Object.entries(data).map(([k,v]) => [k, String(v)])) } };
-  const fakeEvent = { target: { closest: () => fakeEl }, preventDefault: () => {} };
-  // Re-use the click handler logic by calling it directly
-  const pid   = data.projectId ? parseInt(data.projectId) : null;
-  const mid   = data.meetingId ? parseInt(data.meetingId) : null;
+  const pid = data.projectId || null;
+  const mid = data.meetingId || null;
 
   if (action === 'confirm-add-task') {
     const nameEl = document.querySelector(`.add-task-input[data-project-id="${pid}"]`);
@@ -1066,16 +1032,26 @@ function simulateAction(action, data) {
     const name = nameEl?.value.trim();
     if (!name) { if (nameEl) nameEl.focus(); return; }
     const proj = state.projects.find(p => p.id === pid);
-    if (proj) proj.tasks.push({ id: state.nextIds.task++, name, status: 'To Do', dueDate: dateEl?.value || null, done: false });
+    if (proj) {
+      api('/api/tasks', 'POST', { projectId: pid, name, dueDate: dateEl?.value || null })
+        .then(task => { proj.tasks.push(task); state.addingTaskTo = null; renderView(); })
+        .catch(console.error);
+      return;
+    }
     state.addingTaskTo = null; renderView();
   }
-  if (action === 'cancel-add-task')  { state.addingTaskTo = null; renderView(); }
+  if (action === 'cancel-add-task') { state.addingTaskTo = null; renderView(); }
   if (action === 'confirm-add-item') {
     const nameEl = document.querySelector(`.add-item-input[data-meeting-id="${mid}"]`);
     const name = nameEl?.value.trim();
     if (!name) { if (nameEl) nameEl.focus(); return; }
     const meeting = state.meetings.find(m => m.id === mid);
-    if (meeting) meeting.items.push({ id: state.nextIds.item++, name, done: false, hasTimeline: false, deadline: null });
+    if (meeting) {
+      api('/api/items', 'POST', { meetingId: mid, name })
+        .then(item => { meeting.items.push(item); state.addingItemTo = null; renderView(); })
+        .catch(console.error);
+      return;
+    }
     state.addingItemTo = null; renderView();
   }
   if (action === 'cancel-add-item') { state.addingItemTo = null; renderView(); }
@@ -1120,7 +1096,7 @@ function openTimelineModal(meetingId, itemId) {
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn-primary" onclick="confirmDeadline(${meetingId}, ${itemId})">Set Deadline</button>
+      <button class="btn-primary" onclick="confirmDeadline('${meetingId}', '${itemId}')">Set Deadline</button>
     </div>
   `);
 }
@@ -1133,6 +1109,7 @@ function confirmDeadline(meetingId, itemId) {
   if (item) {
     item.hasTimeline = true;
     item.deadline = val;
+    api('/api/items', 'PATCH', { id: itemId, hasTimeline: true, deadline: val }).catch(console.error);
   }
   closeModal();
   renderView();
@@ -1144,7 +1121,7 @@ function openAttachmentModal(invoiceId) {
   const inv = state.invoices.find(i => i.id === invoiceId);
   if (!inv) return;
 
-  const fileInput = `<input type="file" id="attach-file-input" multiple style="display:none" onchange="handleAttachFiles(${invoiceId}, this)">`;
+  const fileInput = `<input type="file" id="attach-file-input" multiple style="display:none" onchange="handleAttachFiles('${invoiceId}', this)">`;
 
   let content;
   if (inv.attachments.length === 0) {
@@ -1310,7 +1287,7 @@ function renderFilePreview() {
   `).join('');
 }
 
-function confirmNewInvoice() {
+async function confirmNewInvoice() {
   const recipient = document.getElementById('inv-recipient')?.value.trim();
   const amount    = document.getElementById('inv-amount')?.value;
   const date      = document.getElementById('inv-date')?.value;
@@ -1323,15 +1300,17 @@ function confirmNewInvoice() {
     return;
   }
 
-  state.invoices.push({
-    id: state.nextIds.invoice++,
-    recipient,
-    amount: parseFloat(amount),
-    reason: reason || '—',
-    date: date || todayISO(),
-    status: status || 'Pending',
-    attachments: [...state.pendingFiles],
-  });
+  try {
+    const inv = await api('/api/invoices', 'POST', {
+      recipient,
+      amount: parseFloat(amount),
+      reason: reason || '—',
+      date: date || todayISO(),
+      status: status || 'Pending',
+    });
+    inv.attachments = [...state.pendingFiles];
+    state.invoices.push(inv);
+  } catch (e) { console.error(e); return; }
 
   closeModal();
   renderView();
@@ -1371,7 +1350,7 @@ function openInviteModal() {
   `);
 }
 
-function confirmInvite() {
+async function confirmInvite() {
   const name  = document.getElementById('inv-name')?.value.trim();
   const email = document.getElementById('inv-email')?.value.trim();
   const role  = document.getElementById('inv-role')?.value;
@@ -1382,13 +1361,10 @@ function confirmInvite() {
     return;
   }
 
-  state.members.push({
-    id: state.nextIds.member++,
-    name,
-    email,
-    role,
-    joinDate: todayISO(),
-  });
+  try {
+    const member = await api('/api/members', 'POST', { name, email, role });
+    state.members.push(member);
+  } catch (e) { console.error(e); return; }
 
   closeModal();
   renderTeamList();
@@ -1422,7 +1398,7 @@ function openNewMeetingModal() {
   setTimeout(() => document.getElementById('mtg-title')?.focus(), 50);
 }
 
-function confirmNewMeeting() {
+async function confirmNewMeeting() {
   const title = document.getElementById('mtg-title')?.value.trim();
   const date  = document.getElementById('mtg-date')?.value;
 
@@ -1432,13 +1408,10 @@ function confirmNewMeeting() {
     return;
   }
 
-  state.meetings.unshift({
-    id: state.nextIds.meeting++,
-    title,
-    date: date || todayISO(),
-    expanded: true,
-    items: [],
-  });
+  try {
+    const meeting = await api('/api/meetings', 'POST', { title, date: date || todayISO() });
+    state.meetings.unshift(meeting);
+  } catch (e) { console.error(e); return; }
 
   closeModal();
   navigate('meetings');
