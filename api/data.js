@@ -46,6 +46,7 @@ module.exports = async (req, res) => {
     reason: i.reason,
     date: i.date,
     status: i.status,
+    paidBy: i.paid_by,
     attachments: [],
   }));
 

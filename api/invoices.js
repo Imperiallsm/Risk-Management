@@ -5,13 +5,13 @@ module.exports = async (req, res) => {
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (req.method === 'POST') {
-    const { recipient, amount, reason, date, status } = req.body || {};
+    const { recipient, amount, reason, date, status, paidBy } = req.body || {};
     if (!recipient || !amount) return res.status(400).json({ error: 'recipient and amount required' });
     const { data, error } = await sb.from('invoices')
-      .insert({ recipient, amount, reason: reason || null, date, status: status || 'Pending' })
+      .insert({ recipient, amount, reason: reason || null, date, status: status || 'Pending', paid_by: paidBy || null })
       .select().single();
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ id: data.id, recipient: data.recipient, amount: data.amount, reason: data.reason, date: data.date, status: data.status, attachments: [] });
+    return res.status(200).json({ id: data.id, recipient: data.recipient, amount: data.amount, reason: data.reason, date: data.date, status: data.status, paidBy: data.paid_by, attachments: [] });
   }
 
   if (req.method === 'PATCH') {

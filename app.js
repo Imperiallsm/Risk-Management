@@ -744,12 +744,15 @@ function renderInvoices() {
   const outstanding = state.invoices.filter(i => i.status !== 'Paid').length;
   const totalVal = state.invoices.reduce((s, i) => s + Number(i.amount), 0);
 
-  const rows = state.invoices.map(inv => `
+  const rows = state.invoices.map(inv => {
+    const paidByMember = state.members.find(m => m.id === inv.paidBy);
+    return `
     <tr>
       <td><strong>${inv.recipient}</strong></td>
       <td class="font-mono">${formatMoney(inv.amount)}</td>
       <td class="text-muted">${inv.reason}</td>
       <td class="text-muted text-sm">${formatDateShort(inv.date)}</td>
+      <td class="text-muted">${paidByMember ? paidByMember.name : '—'}</td>
       <td>
         <span class="status-pill ${statusPillClass(inv.status)}"
               data-action="cycle-invoice-status"
@@ -767,7 +770,7 @@ function renderInvoices() {
         <button class="delete-btn" data-action="delete-invoice" data-invoice-id="${inv.id}" title="Delete invoice">×</button>
       </td>
     </tr>
-  `).join('');
+  `; }).join('');
 
   return `
     <div class="page-header">
@@ -809,6 +812,7 @@ function renderInvoices() {
                 <th>Amount</th>
                 <th>Reason</th>
                 <th>Date</th>
+                <th>Paid By</th>
                 <th>Status</th>
                 <th>Attachments</th>
               </tr>
@@ -1343,6 +1347,13 @@ function openNewInvoiceModal() {
         <input type="text" class="form-input" id="inv-reason" placeholder="e.g. Q2 Consulting Services" />
       </div>
       <div class="form-row">
+        <label class="form-label">Paid By</label>
+        <select class="form-select" id="inv-paid-by">
+          <option value="">— None —</option>
+          ${state.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row">
         <label class="form-label">Status</label>
         <select class="form-select" id="inv-status">
           <option value="Pending">Pending</option>
@@ -1416,6 +1427,7 @@ async function confirmNewInvoice() {
   const date      = document.getElementById('inv-date')?.value;
   const reason    = document.getElementById('inv-reason')?.value.trim();
   const status    = document.getElementById('inv-status')?.value;
+  const paidBy    = document.getElementById('inv-paid-by')?.value || null;
 
   if (!recipient || !amount) {
     if (!recipient) document.getElementById('inv-recipient').style.borderColor = 'var(--urgent)';
@@ -1430,6 +1442,7 @@ async function confirmNewInvoice() {
       reason: reason || '—',
       date: date || todayISO(),
       status: status || 'Pending',
+      paidBy: paidBy || null,
     });
     inv.attachments = [...state.pendingFiles];
     state.invoices.push(inv);
