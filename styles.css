@@ -91,7 +91,7 @@
 html { font-size: 14px; }
 
 body {
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
@@ -140,7 +140,7 @@ body {
 }
 
 .auth-brand-name {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 26px;
   font-weight: 600;
   color: var(--text);
@@ -165,7 +165,7 @@ body {
 }
 
 .auth-heading {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 21px;
   font-weight: 600;
   color: var(--text);
@@ -187,7 +187,7 @@ body {
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 14px;
   outline: none;
   transition: border-color var(--trans), box-shadow var(--trans);
@@ -221,7 +221,7 @@ body {
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 20px;
   font-weight: 600;
   text-align: center;
@@ -244,7 +244,7 @@ body {
   background: none;
   border: none;
   color: var(--text-3);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 13px;
   cursor: pointer;
   padding: 0;
@@ -311,7 +311,7 @@ body {
 }
 
 .sidebar-name {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
@@ -455,7 +455,7 @@ body {
   color: var(--bg);
   border: none;
   border-radius: var(--radius);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -477,7 +477,7 @@ body {
 .page-title-block {}
 
 .page-title {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 30px;
   font-weight: 600;
   color: var(--text);
@@ -512,7 +512,7 @@ body {
   color: var(--bg);
   border: none;
   border-radius: var(--radius);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -530,7 +530,7 @@ body {
   color: var(--text-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -769,7 +769,7 @@ body {
 }
 
 .project-group-name {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 17px;
   font-weight: 600;
   color: var(--text);
@@ -816,7 +816,7 @@ body {
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 13px;
   outline: none;
 }
@@ -829,7 +829,7 @@ body {
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 12px;
   outline: none;
   width: 140px;
@@ -852,7 +852,7 @@ body {
   border-right: none;
   border-bottom: none;
   width: 100%;
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   text-align: left;
 }
 
@@ -1034,7 +1034,7 @@ body {
   padding: 4px 0;
   background: none;
   border: none;
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   transition: color var(--trans);
 }
 .add-item-trigger:hover { color: var(--text); }
@@ -1067,7 +1067,7 @@ body {
 }
 
 .summary-item-value {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 26px;
   font-weight: 600;
   color: var(--text);
@@ -1085,7 +1085,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 11.5px;
   color: var(--text-2);
   cursor: pointer;
@@ -1129,7 +1129,7 @@ body {
 }
 
 .member-name {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 17px;
   font-weight: 600;
   color: var(--text);
@@ -1206,7 +1206,7 @@ body {
 }
 
 .modal-title {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: Arial, sans-serif;
   font-size: 20px;
   font-weight: 600;
   color: var(--text);
@@ -1264,7 +1264,7 @@ body {
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
-  font-family: 'Outfit', sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 13.5px;
   outline: none;
   transition: border-color var(--trans);
