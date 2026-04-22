@@ -9,6 +9,8 @@ const WHITELIST = new Set([
   'james@riskuniversalis.com',
   'priya@riskuniversalis.com',
   'demo@riskuniversalis.com',
+  'riskimperialist@gmail.com',
+  'saltbear1project.rt@gmail.com',
 ]);
 
 module.exports = async (req, res) => {
