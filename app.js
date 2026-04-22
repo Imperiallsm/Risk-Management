@@ -4,14 +4,7 @@
 //  CONSTANTS
 // ══════════════════════════════════════════════════
 
-const EMAIL_WHITELIST = [
-  'alverzalexander0@gmail.com',
-  'admin@riskuniversalis.com',
-  'sarah@riskuniversalis.com',
-  'james@riskuniversalis.com',
-  'priya@riskuniversalis.com',
-  'demo@riskuniversalis.com',
-];
+let pendingEmail = '';
 
 const STATUS_CYCLE = ['To Do', 'In Progress', 'Review', 'Stuck', 'Done'];
 const INVOICE_STATUS_CYCLE = ['Pending', 'Paid', 'Overdue'];
@@ -216,7 +209,28 @@ function toggleTheme() {
 //  AUTH
 // ══════════════════════════════════════════════════
 
+function getStoredSession() {
+  try {
+    const raw = localStorage.getItem('ru_session');
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s.access_token || !s.expires_at) return null;
+    if (Math.floor(Date.now() / 1000) >= s.expires_at) {
+      localStorage.removeItem('ru_session');
+      return null;
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+
 function initAuth() {
+  if (getStoredSession()) {
+    enterApp();
+    return;
+  }
+
   const continueBtn = document.getElementById('continue-btn');
   const emailInput  = document.getElementById('email-input');
   const backBtn     = document.getElementById('back-btn');
@@ -227,29 +241,48 @@ function initAuth() {
   initOTP();
 }
 
-function checkEmail() {
+async function checkEmail() {
   const input = document.getElementById('email-input');
   const error = document.getElementById('email-error');
-  const val = input.value.trim().toLowerCase();
-
-  if (!EMAIL_WHITELIST.includes(val)) {
-    error.classList.add('show');
-    input.style.borderColor = 'var(--urgent)';
-    input.focus();
-    return;
-  }
+  const btn   = document.getElementById('continue-btn');
+  const val   = input.value.trim().toLowerCase();
 
   error.classList.remove('show');
   input.style.borderColor = '';
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
 
-  document.getElementById('masked-email').textContent = maskEmail(val);
-  document.getElementById('step-email').classList.add('hidden');
-  document.getElementById('step-code').classList.remove('hidden');
+  try {
+    const res = await fetch('/api/check-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: val }),
+    });
 
-  setTimeout(() => {
-    const boxes = document.querySelectorAll('.otp-box');
-    if (boxes[0]) boxes[0].focus();
-  }, 50);
+    if (!res.ok) {
+      error.textContent = 'Access denied — email not recognized.';
+      error.classList.add('show');
+      input.style.borderColor = 'var(--urgent)';
+      input.focus();
+      return;
+    }
+
+    pendingEmail = val;
+    document.getElementById('masked-email').textContent = maskEmail(val);
+    document.getElementById('step-email').classList.add('hidden');
+    document.getElementById('step-code').classList.remove('hidden');
+
+    setTimeout(() => {
+      const boxes = document.querySelectorAll('.otp-box');
+      if (boxes[0]) boxes[0].focus();
+    }, 50);
+  } catch {
+    error.textContent = 'Connection error. Please try again.';
+    error.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Continue';
+  }
 }
 
 function goBackToEmail() {
@@ -297,10 +330,33 @@ function initOTP() {
   });
 }
 
-function checkOTPComplete(boxes) {
+async function checkOTPComplete(boxes) {
   const code = boxes.map(b => b.value).join('');
-  if (code.length === 6 && /^\d{6}$/.test(code)) {
-    setTimeout(enterApp, 120);
+  if (code.length !== 6 || !/^\d{6}$/.test(code)) return;
+
+  boxes.forEach(b => { b.disabled = true; });
+  const hint = document.querySelector('.auth-hint');
+
+  try {
+    const res = await fetch('/api/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: pendingEmail, token: code }),
+    });
+
+    if (!res.ok) {
+      boxes.forEach(b => { b.disabled = false; b.value = ''; });
+      boxes[0].focus();
+      if (hint) { hint.textContent = 'Incorrect code — try again.'; hint.style.color = 'var(--urgent)'; }
+      return;
+    }
+
+    const { access_token, expires_at } = await res.json();
+    localStorage.setItem('ru_session', JSON.stringify({ access_token, expires_at, email: pendingEmail }));
+    enterApp();
+  } catch {
+    boxes.forEach(b => { b.disabled = false; });
+    if (hint) { hint.textContent = 'Connection error — try again.'; hint.style.color = 'var(--urgent)'; }
   }
 }
 
