@@ -6,12 +6,13 @@ module.exports = async (req, res) => {
 
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-  const [proj, meet, inv, mem, chan] = await Promise.all([
+  const [proj, meet, inv, mem, chan, prof] = await Promise.all([
     sb.from('projects').select('*, tasks:project_tasks(*)').order('created_at'),
     sb.from('meetings').select('*, items:meeting_items(*)').order('created_at', { ascending: false }),
     sb.from('invoices').select('*').order('created_at', { ascending: false }),
     sb.from('members').select('*').order('join_date'),
     sb.from('stat_channels').select('*, charts:stat_charts(*)').order('created_at'),
+    sb.from('profiles').select('*'),
   ]);
 
   const projects = (proj.data || []).map(p => ({
@@ -71,5 +72,8 @@ module.exports = async (req, res) => {
     })),
   }));
 
-  return res.status(200).json({ projects, meetings, invoices, members, channels });
+  const profiles = {};
+  (prof.data || []).forEach(p => { profiles[p.email] = p.avatar_url; });
+
+  return res.status(200).json({ projects, meetings, invoices, members, channels, profiles });
 };

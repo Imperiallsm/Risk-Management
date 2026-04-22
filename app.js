@@ -34,6 +34,8 @@ const state = {
   channels: [],
   activeChannel: null,
 
+  profiles: {},
+
   // UI flags
   addingTaskTo:  null,
   addingItemTo:  null,
@@ -336,6 +338,7 @@ async function initApp() {
     state.members   = data.members;
     state.channels  = data.channels || [];
     state.activeChannel = state.channels[0]?.id || null;
+    state.profiles  = data.profiles || {};
   } catch (e) {
     console.error('Failed to load data:', e);
   }
@@ -343,6 +346,7 @@ async function initApp() {
   app.classList.remove('app-hidden');
   app.classList.add('app-visible');
   renderTeamList();
+  renderSidebarFooter();
   navigate('overview', true);
   bindAppEvents();
 }
@@ -431,15 +435,43 @@ function afterRender() {
 //  SIDEBAR TEAM LIST
 // ══════════════════════════════════════════════════
 
+function avatarEl(name, email, size = 28) {
+  const url = state.profiles[email];
+  if (url) return `<img src="${url}" alt="${name}" class="avatar-img" style="width:${size}px;height:${size}px" />`;
+  return `<div class="team-avatar" style="background:${getAvatarColor(name)};width:${size}px;height:${size}px">${getInitials(name)}</div>`;
+}
+
 function renderTeamList() {
   const el = document.getElementById('team-list');
   if (!el) return;
   el.innerHTML = state.members.map(m => `
     <div class="team-member-row">
-      <div class="team-avatar" style="background:${getAvatarColor(m.name)}">${getInitials(m.name)}</div>
+      ${avatarEl(m.name, m.email)}
       <span class="team-member-name">${m.name.split(' ')[0]}</span>
     </div>
   `).join('');
+}
+
+function renderSidebarFooter() {
+  const el = document.getElementById('sidebar-user-foot');
+  if (!el) return;
+  const email = getStoredSession()?.email || '';
+  const member = state.members.find(m => m.email === email);
+  const name = member?.name || email.split('@')[0];
+  const url = state.profiles[email];
+  const avatar = url
+    ? `<img src="${url}" alt="${name}" class="avatar-img" style="width:28px;height:28px" />`
+    : `<div class="team-avatar" style="background:${getAvatarColor(name)};width:28px;height:28px;font-size:11px">${getInitials(name)}</div>`;
+
+  el.innerHTML = `
+    <div class="sidebar-user">
+      ${avatar}
+      <span class="sidebar-user-name">${name}</span>
+      <button class="sidebar-settings-btn" onclick="openSettingsModal()" title="Settings">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  `;
 }
 
 // ══════════════════════════════════════════════════
@@ -953,7 +985,9 @@ function renderMembers() {
   const cards = state.members.map(m => `
     <div class="member-card">
       <button class="delete-btn member-delete-btn" data-action="delete-member" data-member-id="${m.id}" title="Remove member">×</button>
-      <div class="member-avatar" style="background:${getAvatarColor(m.name)}">${getInitials(m.name)}</div>
+      ${state.profiles[m.email]
+        ? `<img src="${state.profiles[m.email]}" alt="${m.name}" class="member-avatar avatar-img" />`
+        : `<div class="member-avatar" style="background:${getAvatarColor(m.name)}">${getInitials(m.name)}</div>`}
       <div class="member-name">${m.name}</div>
       <div class="member-role-pill">${m.role}</div>
       <div class="member-meta">
@@ -1751,6 +1785,82 @@ async function confirmNewMeeting() {
 
   closeModal();
   navigate('meetings');
+}
+
+// ── Settings Modal ───────────────────────────────
+
+function openSettingsModal() {
+  const email = getStoredSession()?.email || '';
+  const member = state.members.find(m => m.email === email);
+  const name = member?.name || email.split('@')[0];
+  const url = state.profiles[email];
+
+  const avatarPreview = url
+    ? `<img src="${url}" alt="${name}" class="settings-avatar-img" />`
+    : `<div class="team-avatar settings-avatar-placeholder" style="background:${getAvatarColor(name)}">${getInitials(name)}</div>`;
+
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Settings</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-profile-row">
+        <div class="settings-avatar-wrap" id="settings-avatar-preview">${avatarPreview}</div>
+        <div class="settings-profile-info">
+          <p class="settings-profile-name">${name}</p>
+          <p class="settings-profile-email">${email}</p>
+          <button class="btn-ghost btn-sm" style="margin-top:10px" onclick="document.getElementById('avatar-file-input').click()">Change Photo</button>
+          <input type="file" id="avatar-file-input" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="signOut()">Sign Out</button>
+      <button class="btn-ghost" onclick="closeModal()">Close</button>
+    </div>
+  `);
+}
+
+async function handleAvatarUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const dataUrl = await resizeImage(file, 200);
+  const email = getStoredSession()?.email || '';
+
+  const preview = document.getElementById('settings-avatar-preview');
+  if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="Avatar" class="settings-avatar-img" />`;
+
+  state.profiles[email] = dataUrl;
+  renderSidebarFooter();
+  renderTeamList();
+  if (state.view === 'members') renderView();
+
+  api('/api/profile', 'POST', { email, avatarUrl: dataUrl }).catch(console.error);
+}
+
+function resizeImage(file, maxSize) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function signOut() {
+  localStorage.removeItem('ru_session');
+  location.reload();
 }
 
 // ── New Channel Modal ─────────────────────────────
