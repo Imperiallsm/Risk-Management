@@ -15,11 +15,13 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === 'PATCH') {
-    const { id, done, status } = req.body || {};
+    const { id, done, status, name, dueDate } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
     const updates = {};
     if (done !== undefined) updates.done = done;
     if (status !== undefined) updates.status = status;
+    if (name !== undefined) updates.name = name;
+    if (dueDate !== undefined) updates.due_date = dueDate;
     const { error } = await sb.from('project_tasks').update(updates).eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ success: true });

@@ -50,6 +50,17 @@ module.exports = async (req, res) => {
     return res.status(200).json({ id: data.id, name: data.name, email: data.email, role: data.role, joinDate: data.join_date });
   }
 
+  if (req.method === 'PATCH') {
+    const { id, name, role } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (role !== undefined) updates.role = role;
+    const { error } = await sb.from('members').update(updates).eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true });
+  }
+
   if (req.method === 'DELETE') {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });

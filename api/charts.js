@@ -20,6 +20,18 @@ module.exports = async (req, res) => {
     });
   }
 
+  if (req.method === 'PATCH') {
+    const { id, title, chartType, data } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (chartType !== undefined) updates.chart_type = chartType;
+    if (data !== undefined) updates.data = data;
+    const { error } = await sb.from('stat_charts').update(updates).eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true });
+  }
+
   if (req.method === 'DELETE') {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });

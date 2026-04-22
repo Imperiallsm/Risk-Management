@@ -14,6 +14,17 @@ module.exports = async (req, res) => {
     return res.status(200).json({ id: data.id, title: data.title, date: data.date, expanded: true, items: [] });
   }
 
+  if (req.method === 'PATCH') {
+    const { id, title, date } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (date !== undefined) updates.date = date;
+    const { error } = await sb.from('meetings').update(updates).eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true });
+  }
+
   if (req.method === 'DELETE') {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });

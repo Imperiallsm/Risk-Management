@@ -15,6 +15,8 @@ const AVATAR_COLORS = [
   '#f97316','#3b82f6',
 ];
 
+const PENCIL_ICON = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -535,6 +537,7 @@ function renderChartCard(chart, channelId) {
       <div class="chart-card-header">
         <span class="chart-card-title">${chart.title}</span>
         <div class="chart-card-actions">
+          <button class="icon-btn" data-action="edit-chart" data-channel-id="${channelId}" data-chart-id="${chart.id}" title="Edit">${PENCIL_ICON}</button>
           <button class="icon-btn" data-action="duplicate-chart" data-channel-id="${channelId}" data-chart-id="${chart.id}" title="Duplicate">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
@@ -755,7 +758,8 @@ function renderProjectGroup(project) {
               data-task-id="${t.id}">${t.status}</span>
       </td>
       <td class="text-muted text-sm">${formatDateShort(t.dueDate)}</td>
-      <td style="width:32px;text-align:right">
+      <td style="width:56px;text-align:right">
+        <button class="icon-btn" data-action="edit-task" data-project-id="${project.id}" data-task-id="${t.id}" title="Edit task">${PENCIL_ICON}</button>
         <button class="delete-btn" data-action="delete-task" data-project-id="${project.id}" data-task-id="${t.id}" title="Delete task">×</button>
       </td>
     </tr>
@@ -791,8 +795,9 @@ function renderProjectGroup(project) {
     <div class="project-group">
       <div class="project-group-header">
         <span class="project-group-name">${project.name}</span>
-        <div style="display:flex;align-items:center;gap:12px">
+        <div style="display:flex;align-items:center;gap:8px">
           <span class="project-count">${project.tasks.length} task${project.tasks.length !== 1 ? 's' : ''}</span>
+          <button class="icon-btn" data-action="edit-project" data-project-id="${project.id}" title="Edit project">${PENCIL_ICON}</button>
           <button class="delete-btn" data-action="delete-project" data-project-id="${project.id}" title="Delete project">×</button>
         </div>
       </div>
@@ -857,6 +862,7 @@ function renderMeetingCard(meeting) {
              data-item-id="${item.id}"></div>
         <span class="agenda-item-name ${item.done ? 'done' : ''}">${item.name}</span>
         ${deadlineBadge}
+        <button class="icon-btn" data-action="edit-item" data-meeting-id="${meeting.id}" data-item-id="${item.id}" title="Edit item">${PENCIL_ICON}</button>
         <button class="delete-btn" data-action="delete-item" data-meeting-id="${meeting.id}" data-item-id="${item.id}" title="Delete item">×</button>
         <div class="timeline-toggle ${item.hasTimeline ? 'has-timeline' : ''}"
              data-action="toggle-timeline"
@@ -897,6 +903,7 @@ function renderMeetingCard(meeting) {
         </div>
         <div style="display:flex;align-items:center;gap:12px">
           <span class="meeting-item-count">${doneCount}/${meeting.items.length} done</span>
+          <button class="icon-btn" data-action="edit-meeting" data-meeting-id="${meeting.id}" title="Edit meeting">${PENCIL_ICON}</button>
           <button class="delete-btn" data-action="delete-meeting" data-meeting-id="${meeting.id}" title="Delete meeting">×</button>
         </div>
       </div>
@@ -943,7 +950,8 @@ function renderInvoices() {
           ${inv.attachments.length > 0 ? inv.attachments.length : 'Attach'}
         </button>
       </td>
-      <td style="width:32px">
+      <td style="width:56px">
+        <button class="icon-btn" data-action="edit-invoice" data-invoice-id="${inv.id}" title="Edit invoice">${PENCIL_ICON}</button>
         <button class="delete-btn" data-action="delete-invoice" data-invoice-id="${inv.id}" title="Delete invoice">×</button>
       </td>
     </tr>
@@ -1008,7 +1016,10 @@ function renderInvoices() {
 function renderMembers() {
   const cards = state.members.map(m => `
     <div class="member-card">
-      <button class="delete-btn member-delete-btn" data-action="delete-member" data-member-id="${m.id}" title="Remove member">×</button>
+      <div class="member-card-actions">
+        <button class="icon-btn" data-action="edit-member" data-member-id="${m.id}" title="Edit member">${PENCIL_ICON}</button>
+        <button class="delete-btn member-delete-btn" data-action="delete-member" data-member-id="${m.id}" title="Remove member">×</button>
+      </div>
       ${state.profiles[m.email]
         ? `<img src="${state.profiles[m.email]}" alt="${m.name}" class="member-avatar avatar-img" />`
         : `<div class="member-avatar" style="background:${getAvatarColor(m.name)}">${getInitials(m.name)}</div>`}
@@ -1279,6 +1290,52 @@ async function handleMainClick(e) {
         renderView();
         api('/api/members', 'DELETE', { id: memberId }).catch(console.error);
       });
+      break;
+    }
+
+    case 'edit-project': {
+      const proj = state.projects.find(p => p.id === pid);
+      if (proj) openEditProjectModal(proj);
+      break;
+    }
+
+    case 'edit-task': {
+      const proj = state.projects.find(p => p.id === pid);
+      const task = proj?.tasks.find(t => t.id === tid);
+      if (task) openEditTaskModal(proj, task);
+      break;
+    }
+
+    case 'edit-meeting': {
+      const meeting = state.meetings.find(m => m.id === mid);
+      if (meeting) openEditMeetingModal(meeting);
+      break;
+    }
+
+    case 'edit-item': {
+      const meeting = state.meetings.find(m => m.id === mid);
+      const item = meeting?.items.find(i => i.id === iid);
+      if (item) openEditItemModal(meeting, item);
+      break;
+    }
+
+    case 'edit-invoice': {
+      const inv = state.invoices.find(i => i.id === invId);
+      if (inv) openEditInvoiceModal(inv);
+      break;
+    }
+
+    case 'edit-member': {
+      const memberId = el.dataset.memberId || null;
+      const member = state.members.find(m => m.id === memberId);
+      if (member) openEditMemberModal(member);
+      break;
+    }
+
+    case 'edit-chart': {
+      const ch = state.channels.find(c => c.id === chanId);
+      const chart = ch?.charts.find(c => c.id === chartId);
+      if (chart) openEditChartModal(ch, chart);
       break;
     }
 
@@ -1828,6 +1885,281 @@ async function confirmNewMeeting() {
 
   closeModal();
   navigate('meetings');
+}
+
+// ── Edit Modals ───────────────────────────────────
+
+function openEditProjectModal(project) {
+  openModal(`
+    <div class="modal-header"><span class="modal-title">Edit Project</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Project Name</label>
+        <input type="text" class="form-input" id="edit-proj-name" value="${project.name}" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditProject('${project.id}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('edit-proj-name')?.focus(), 50);
+}
+
+async function confirmEditProject(pid) {
+  const name = document.getElementById('edit-proj-name')?.value.trim();
+  if (!name) return;
+  const proj = state.projects.find(p => p.id === pid);
+  if (proj) proj.name = name;
+  closeModal(); renderView();
+  api('/api/projects', 'PATCH', { id: pid, name }).catch(console.error);
+}
+
+function openEditTaskModal(project, task) {
+  openModal(`
+    <div class="modal-header"><span class="modal-title">Edit Task</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Task Name</label>
+        <input type="text" class="form-input" id="edit-task-name" value="${task.name}" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Due Date</label>
+        <input type="date" class="form-input" id="edit-task-date" value="${task.dueDate || ''}" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditTask('${project.id}', '${task.id}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('edit-task-name')?.focus(), 50);
+}
+
+async function confirmEditTask(pid, tid) {
+  const name    = document.getElementById('edit-task-name')?.value.trim();
+  const dueDate = document.getElementById('edit-task-date')?.value || null;
+  if (!name) return;
+  const proj = state.projects.find(p => p.id === pid);
+  const task = proj?.tasks.find(t => t.id === tid);
+  if (task) { task.name = name; task.dueDate = dueDate; }
+  closeModal(); renderView();
+  api('/api/tasks', 'PATCH', { id: tid, name, dueDate }).catch(console.error);
+}
+
+function openEditMeetingModal(meeting) {
+  openModal(`
+    <div class="modal-header"><span class="modal-title">Edit Meeting</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Title</label>
+        <input type="text" class="form-input" id="edit-mtg-title" value="${meeting.title}" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="edit-mtg-date" value="${meeting.date || ''}" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditMeeting('${meeting.id}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('edit-mtg-title')?.focus(), 50);
+}
+
+async function confirmEditMeeting(mid) {
+  const title = document.getElementById('edit-mtg-title')?.value.trim();
+  const date  = document.getElementById('edit-mtg-date')?.value || null;
+  if (!title) return;
+  const meeting = state.meetings.find(m => m.id === mid);
+  if (meeting) { meeting.title = title; if (date) meeting.date = date; }
+  closeModal(); renderView();
+  api('/api/meetings', 'PATCH', { id: mid, title, date }).catch(console.error);
+}
+
+function openEditItemModal(meeting, item) {
+  openModal(`
+    <div class="modal-header"><span class="modal-title">Edit Agenda Item</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Item Name</label>
+        <input type="text" class="form-input" id="edit-item-name" value="${item.name}" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditItem('${meeting.id}', '${item.id}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('edit-item-name')?.focus(), 50);
+}
+
+async function confirmEditItem(mid, iid) {
+  const name = document.getElementById('edit-item-name')?.value.trim();
+  if (!name) return;
+  const meeting = state.meetings.find(m => m.id === mid);
+  const item = meeting?.items.find(i => i.id === iid);
+  if (item) item.name = name;
+  closeModal(); renderView();
+  api('/api/items', 'PATCH', { id: iid, name }).catch(console.error);
+}
+
+function openEditInvoiceModal(inv) {
+  openModal(`
+    <div class="modal-header"><span class="modal-title">Edit Invoice</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Recipient</label>
+        <input type="text" class="form-input" id="edit-inv-recipient" value="${inv.recipient}" />
+      </div>
+      <div class="form-row-grid">
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Amount ($)</label>
+          <input type="number" class="form-input" id="edit-inv-amount" value="${inv.amount}" min="0" />
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-input" id="edit-inv-date" value="${inv.date || ''}" />
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:16px">
+        <label class="form-label">Reason</label>
+        <input type="text" class="form-input" id="edit-inv-reason" value="${inv.reason || ''}" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Paid By</label>
+        <select class="form-select" id="edit-inv-paid-by">
+          <option value="">— None —</option>
+          ${state.members.map(m => `<option value="${m.id}" ${inv.paidBy === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="edit-inv-status">
+          ${['Pending','Paid','Overdue'].map(s => `<option value="${s}" ${inv.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditInvoice('${inv.id}')">Save</button>
+    </div>
+  `);
+}
+
+async function confirmEditInvoice(invId) {
+  const recipient = document.getElementById('edit-inv-recipient')?.value.trim();
+  const amount    = document.getElementById('edit-inv-amount')?.value;
+  const date      = document.getElementById('edit-inv-date')?.value || null;
+  const reason    = document.getElementById('edit-inv-reason')?.value.trim();
+  const paidBy    = document.getElementById('edit-inv-paid-by')?.value || null;
+  const status    = document.getElementById('edit-inv-status')?.value;
+  if (!recipient || !amount) return;
+  const inv = state.invoices.find(i => i.id === invId);
+  if (inv) { inv.recipient = recipient; inv.amount = parseFloat(amount); inv.date = date; inv.reason = reason; inv.paidBy = paidBy; inv.status = status; }
+  closeModal(); renderView();
+  api('/api/invoices', 'PATCH', { id: invId, recipient, amount: parseFloat(amount), date, reason, paidBy, status }).catch(console.error);
+}
+
+function openEditMemberModal(member) {
+  openModal(`
+    <div class="modal-header"><span class="modal-title">Edit Member</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Full Name</label>
+        <input type="text" class="form-input" id="edit-mem-name" value="${member.name}" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Role</label>
+        <select class="form-select" id="edit-mem-role">
+          ${['Member','Editor','Viewer','Admin'].map(r => `<option value="${r}" ${member.role === r ? 'selected' : ''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label" style="color:var(--text-3)">Email (cannot be changed)</label>
+        <input type="text" class="form-input" value="${member.email}" disabled style="opacity:0.5" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditMember('${member.id}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('edit-mem-name')?.focus(), 50);
+}
+
+async function confirmEditMember(memberId) {
+  const name = document.getElementById('edit-mem-name')?.value.trim();
+  const role = document.getElementById('edit-mem-role')?.value;
+  if (!name) return;
+  const member = state.members.find(m => m.id === memberId);
+  if (member) { member.name = name; member.role = role; }
+  closeModal(); renderTeamList(); renderView();
+  api('/api/members', 'PATCH', { id: memberId, name, role }).catch(console.error);
+}
+
+function openEditChartModal(channel, chart) {
+  _pendingChartType = chart.chartType || 'bar';
+  const isTimeline = _pendingChartType === 'timeline';
+  _pendingChartRows = chart.data.map(d => {
+    if (isTimeline) {
+      const [year, month] = d.label.split('-');
+      return { month: month || '01', year: year || String(new Date().getFullYear()), value: String(d.value) };
+    }
+    return { label: d.label, value: String(d.value) };
+  });
+  if (!_pendingChartRows.length) _pendingChartRows = [getEmptyRow(_pendingChartType)];
+
+  openModal(`
+    <div class="modal-header"><span class="modal-title">Edit Chart</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Chart Title</label>
+        <input type="text" class="form-input" id="chart-title" value="${chart.title}" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Chart Type</label>
+        <select class="form-select" id="chart-type" onchange="handleChartTypeChange(this.value, '${channel.id}')">
+          ${['bar','line','pie','doughnut','timeline'].map(t => `<option value="${t}" ${_pendingChartType === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Data</label>
+        <div id="chart-rows-header" class="chart-rows-header"></div>
+        <div id="chart-rows"></div>
+        <button class="btn-ghost btn-sm" style="margin-top:8px" onclick="addChartRow('${channel.id}')">+ Add Row</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditChart('${channel.id}', '${chart.id}')">Save</button>
+    </div>
+  `);
+  renderModalChartRows(channel.id);
+}
+
+async function confirmEditChart(chanId, chartId) {
+  const title     = document.getElementById('chart-title')?.value.trim();
+  const chartType = document.getElementById('chart-type')?.value;
+  if (!title) return;
+
+  let data;
+  if (_pendingChartType === 'timeline') {
+    data = _pendingChartRows.filter(r => r.value !== '')
+      .map(r => ({ label: `${r.year}-${r.month}`, value: parseFloat(r.value) || 0 }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  } else {
+    data = _pendingChartRows.filter(r => r.label?.trim() && r.value !== '')
+      .map(r => ({ label: r.label.trim(), value: parseFloat(r.value) || 0 }));
+  }
+  if (!data.length) return;
+
+  const channel = state.channels.find(c => c.id === chanId);
+  const chart = channel?.charts.find(c => c.id === chartId);
+  if (chart) { chart.title = title; chart.chartType = chartType; chart.data = data; }
+  closeModal(); renderView();
+  api('/api/charts', 'PATCH', { id: chartId, title, chartType, data }).catch(console.error);
 }
 
 // ── Settings Modal ───────────────────────────────

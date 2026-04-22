@@ -15,9 +15,16 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === 'PATCH') {
-    const { id, status } = req.body || {};
+    const { id, status, recipient, amount, reason, date, paidBy } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { error } = await sb.from('invoices').update({ status }).eq('id', id);
+    const updates = {};
+    if (status !== undefined) updates.status = status;
+    if (recipient !== undefined) updates.recipient = recipient;
+    if (amount !== undefined) updates.amount = amount;
+    if (reason !== undefined) updates.reason = reason;
+    if (date !== undefined) updates.date = date;
+    if (paidBy !== undefined) updates.paid_by = paidBy;
+    const { error } = await sb.from('invoices').update(updates).eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ success: true });
   }
