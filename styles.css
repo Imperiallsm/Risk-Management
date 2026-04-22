@@ -1673,12 +1673,50 @@ tr:hover .delete-btn,
   margin-bottom: 6px;
 }
 
+.chart-rows-header.timeline {
+  grid-template-columns: 2fr 1fr 1fr 32px;
+}
+
 .chart-row-item {
   display: grid;
   grid-template-columns: 1fr 1fr 32px;
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.chart-row-timeline {
+  grid-template-columns: 2fr 1fr 1fr 32px;
+}
+
+.chart-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--trans);
+}
+
+.chart-card:hover .chart-card-actions {
+  opacity: 1;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 4px 5px;
+  border-radius: 5px;
+  color: var(--text-3);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--trans), background var(--trans);
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
 }
 
 .chart-row-item .form-input {

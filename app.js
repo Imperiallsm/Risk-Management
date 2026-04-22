@@ -15,6 +15,9 @@ const AVATAR_COLORS = [
   '#f97316','#3b82f6',
 ];
 
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 // ══════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════
@@ -531,9 +534,14 @@ function renderChartCard(chart, channelId) {
     <div class="chart-card">
       <div class="chart-card-header">
         <span class="chart-card-title">${chart.title}</span>
-        <button class="delete-btn" data-action="delete-chart" data-channel-id="${channelId}" data-chart-id="${chart.id}">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-        </button>
+        <div class="chart-card-actions">
+          <button class="icon-btn" data-action="duplicate-chart" data-channel-id="${channelId}" data-chart-id="${chart.id}" title="Duplicate">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="delete-btn" data-action="delete-chart" data-channel-id="${channelId}" data-chart-id="${chart.id}" title="Delete">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
       </div>
       <div class="chart-canvas-wrap">
         <canvas id="chart-${chart.id}" data-chart-id="${chart.id}" data-chart-type="${chart.chartType}"></canvas>
@@ -555,10 +563,23 @@ function initCharts() {
     }
     if (!chartData || !chartData.data.length) return;
 
-    const labels = chartData.data.map(d => d.label);
-    const values = chartData.data.map(d => d.value);
-    const type = chartData.chartType || 'bar';
+    const isTimeline = chartData.chartType === 'timeline';
+    const renderType = isTimeline ? 'line' : (chartData.chartType || 'bar');
+    const type = renderType;
     const isRound = type === 'pie' || type === 'doughnut';
+
+    const sorted = isTimeline
+      ? [...chartData.data].sort((a, b) => a.label.localeCompare(b.label))
+      : chartData.data;
+
+    const labels = sorted.map(d => {
+      if (isTimeline) {
+        const [yr, mo] = d.label.split('-');
+        return (MONTHS_SHORT[parseInt(mo) - 1] || mo) + ' ' + yr;
+      }
+      return d.label;
+    });
+    const values = sorted.map(d => d.value);
 
     new Chart(canvas, {
       type,
@@ -1289,6 +1310,23 @@ async function handleMainClick(e) {
       break;
     }
 
+    case 'duplicate-chart': {
+      const srcChannel = state.channels.find(c => c.id === chanId);
+      const srcChart = srcChannel?.charts.find(c => c.id === chartId);
+      if (!srcChart) return;
+      try {
+        const copy = await api('/api/charts', 'POST', {
+          channelId: chanId,
+          title: srcChart.title + ' (copy)',
+          chartType: srcChart.chartType,
+          data: srcChart.data,
+        });
+        srcChannel.charts.push(copy);
+      } catch (e) { console.error(e); }
+      renderView();
+      break;
+    }
+
     case 'delete-chart': {
       const chartChannel = state.channels.find(c => c.id === chanId);
       const chart = chartChannel?.charts.find(c => c.id === chartId);
@@ -1909,9 +1947,17 @@ async function confirmNewChannel() {
 // ── New Chart Modal ───────────────────────────────
 
 let _pendingChartRows = [{ label: '', value: '' }];
+let _pendingChartType = 'bar';
+
+function getEmptyRow(type) {
+  return type === 'timeline'
+    ? { month: '01', year: String(new Date().getFullYear()), value: '' }
+    : { label: '', value: '' };
+}
 
 function openNewChartModal(channelId) {
-  _pendingChartRows = [{ label: '', value: '' }];
+  _pendingChartType = 'bar';
+  _pendingChartRows = [getEmptyRow('bar')];
   openModal(`
     <div class="modal-header">
       <span class="modal-title">Add Chart</span>
@@ -1924,18 +1970,17 @@ function openNewChartModal(channelId) {
       </div>
       <div class="form-row">
         <label class="form-label">Chart Type</label>
-        <select class="form-select" id="chart-type">
+        <select class="form-select" id="chart-type" onchange="handleChartTypeChange(this.value, '${channelId}')">
           <option value="bar">Bar</option>
           <option value="line">Line</option>
           <option value="pie">Pie</option>
           <option value="doughnut">Doughnut</option>
+          <option value="timeline">Timeline</option>
         </select>
       </div>
       <div class="form-row">
         <label class="form-label">Data</label>
-        <div class="chart-rows-header">
-          <span>Label</span><span>Value</span>
-        </div>
+        <div id="chart-rows-header" class="chart-rows-header"></div>
         <div id="chart-rows"></div>
         <button class="btn-ghost btn-sm" style="margin-top:8px" onclick="addChartRow('${channelId}')">+ Add Row</button>
       </div>
@@ -1949,24 +1994,61 @@ function openNewChartModal(channelId) {
   setTimeout(() => document.getElementById('chart-title')?.focus(), 50);
 }
 
+function handleChartTypeChange(type, channelId) {
+  _pendingChartType = type;
+  _pendingChartRows = [getEmptyRow(type)];
+  renderModalChartRows(channelId);
+}
+
 function renderModalChartRows(channelId) {
   const el = document.getElementById('chart-rows');
+  const hdr = document.getElementById('chart-rows-header');
   if (!el) return;
-  el.innerHTML = _pendingChartRows.map((row, i) => `
-    <div class="chart-row-item">
-      <input type="text" class="form-input chart-row-label" placeholder="Label" value="${row.label}"
-             oninput="_pendingChartRows[${i}].label = this.value" />
-      <input type="number" class="form-input chart-row-value" placeholder="0" value="${row.value}"
-             oninput="_pendingChartRows[${i}].value = this.value" />
-      ${_pendingChartRows.length > 1
-        ? `<button class="btn-ghost btn-icon" onclick="removeChartRow(${i}, '${channelId}')">✕</button>`
-        : `<span style="width:32px"></span>`}
-    </div>
-  `).join('');
+
+  const isTimeline = _pendingChartType === 'timeline';
+
+  if (hdr) {
+    hdr.className = 'chart-rows-header' + (isTimeline ? ' timeline' : '');
+    hdr.innerHTML = isTimeline
+      ? '<span>Month</span><span>Year</span><span>Value</span><span></span>'
+      : '<span>Label</span><span>Value</span><span></span>';
+  }
+
+  if (isTimeline) {
+    el.innerHTML = _pendingChartRows.map((row, i) => `
+      <div class="chart-row-item chart-row-timeline">
+        <select class="form-select chart-row-month" onchange="_pendingChartRows[${i}].month = this.value">
+          ${MONTHS.map((m, mi) => {
+            const val = String(mi + 1).padStart(2, '0');
+            return `<option value="${val}" ${row.month === val ? 'selected' : ''}>${m}</option>`;
+          }).join('')}
+        </select>
+        <input type="number" class="form-input chart-row-year" value="${row.year}" min="2000" max="2100"
+               oninput="_pendingChartRows[${i}].year = this.value" />
+        <input type="number" class="form-input chart-row-value" placeholder="0" value="${row.value}"
+               oninput="_pendingChartRows[${i}].value = this.value" />
+        ${_pendingChartRows.length > 1
+          ? `<button class="btn-ghost btn-icon" onclick="removeChartRow(${i}, '${channelId}')">✕</button>`
+          : `<span style="width:32px"></span>`}
+      </div>
+    `).join('');
+  } else {
+    el.innerHTML = _pendingChartRows.map((row, i) => `
+      <div class="chart-row-item">
+        <input type="text" class="form-input chart-row-label" placeholder="Label" value="${row.label}"
+               oninput="_pendingChartRows[${i}].label = this.value" />
+        <input type="number" class="form-input chart-row-value" placeholder="0" value="${row.value}"
+               oninput="_pendingChartRows[${i}].value = this.value" />
+        ${_pendingChartRows.length > 1
+          ? `<button class="btn-ghost btn-icon" onclick="removeChartRow(${i}, '${channelId}')">✕</button>`
+          : `<span style="width:32px"></span>`}
+      </div>
+    `).join('');
+  }
 }
 
 function addChartRow(channelId) {
-  _pendingChartRows.push({ label: '', value: '' });
+  _pendingChartRows.push(getEmptyRow(_pendingChartType));
   renderModalChartRows(channelId);
 }
 
@@ -1985,10 +2067,17 @@ async function confirmNewChart(channelId) {
     return;
   }
 
-  const rows = _pendingChartRows.filter(r => r.label.trim() && r.value !== '');
-  if (!rows.length) return;
-
-  const data = rows.map(r => ({ label: r.label.trim(), value: parseFloat(r.value) || 0 }));
+  let data;
+  if (_pendingChartType === 'timeline') {
+    data = _pendingChartRows
+      .filter(r => r.value !== '')
+      .map(r => ({ label: `${r.year}-${r.month}`, value: parseFloat(r.value) || 0 }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  } else {
+    data = _pendingChartRows.filter(r => r.label.trim() && r.value !== '')
+      .map(r => ({ label: r.label.trim(), value: parseFloat(r.value) || 0 }));
+  }
+  if (!data.length) return;
 
   try {
     const chart = await api('/api/charts', 'POST', { channelId, title, chartType, data });
