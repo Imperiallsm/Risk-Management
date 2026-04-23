@@ -6,13 +6,14 @@ module.exports = async (req, res) => {
 
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-  const [proj, meet, inv, mem, chan, prof] = await Promise.all([
+  const [proj, meet, inv, mem, chan, prof, trackerM] = await Promise.all([
     sb.from('projects').select('*, tasks:project_tasks(*)').order('created_at'),
     sb.from('meetings').select('*, items:meeting_items(*)').order('created_at', { ascending: false }),
     sb.from('invoices').select('*').order('created_at', { ascending: false }),
     sb.from('members').select('*').order('join_date'),
     sb.from('stat_channels').select('*, charts:stat_charts(*)').order('created_at'),
     sb.from('profiles').select('*'),
+    sb.from('tracker_months').select('*, entries:tracker_entries(*)').order('created_at'),
   ]);
 
   const projects = (proj.data || []).map(p => ({
@@ -75,5 +76,31 @@ module.exports = async (req, res) => {
   const profiles = {};
   (prof.data || []).forEach(p => { profiles[p.email] = p.avatar_url; });
 
-  return res.status(200).json({ projects, meetings, invoices, members, channels, profiles });
+  const trackerMonths = (trackerM.data || []).map(m => ({
+    id: m.id,
+    name: m.name,
+    entries: (m.entries || [])
+      .map(e => ({
+        id: e.id,
+        monthId: e.month_id,
+        username: e.username,
+        robloxId: e.roblox_id || '',
+        department: e.department || '',
+        observations: e.observations || 0,
+        playtime: e.playtime || 0,
+        applications: e.applications || 0,
+        appeals: e.appeals || 0,
+        banishments: e.banishments || 0,
+        staffReports: e.staff_reports || 0,
+        staffMeetings: e.staff_meetings || 0,
+        messages: e.messages || 0,
+        strikes: e.strikes || 0,
+        status: e.status || 'N/A',
+        robux: e.robux || 0,
+        notes: e.notes || '',
+      }))
+      .sort((a, b) => a.username.localeCompare(b.username)),
+  }));
+
+  return res.status(200).json({ projects, meetings, invoices, members, channels, profiles, trackerMonths });
 };

@@ -1744,3 +1744,147 @@ tr:hover .delete-btn,
   font-size: 13px;
   flex-shrink: 0;
 }
+
+/* ══════════════════════════════════════════════════
+   TRACKER
+══════════════════════════════════════════════════ */
+
+.tracker-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 12px;
+}
+
+.tracker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 1060px;
+}
+
+.tracker-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+}
+
+.tracker-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.tracker-entry-row:last-child td {
+  border-bottom: none;
+}
+
+.tracker-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.tracker-username {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.tracker-mono {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tracker-dept-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.tracker-notes-btn {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: var(--text-3);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--trans), background var(--trans);
+}
+
+.tracker-notes-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.tracker-notes-btn.has-notes {
+  color: #6366f1;
+}
+
+/* Row tinting by status */
+.tracker-row-passed  { background: rgba(34,  197, 94,  0.06); }
+.tracker-row-immune  { background: rgba(20,  184, 166, 0.06); }
+.tracker-row-failed  { background: rgba(239, 68,  68,  0.07); }
+.tracker-row-struck  { background: rgba(249, 115, 22,  0.08); }
+.tracker-row-resigned{ opacity: 0.65; }
+.tracker-row-demoted { background: rgba(113, 113, 122, 0.05); }
+
+[data-theme="dark"] .tracker-row-passed  { background: rgba(34,  197, 94,  0.09); }
+[data-theme="dark"] .tracker-row-immune  { background: rgba(20,  184, 166, 0.09); }
+[data-theme="dark"] .tracker-row-failed  { background: rgba(239, 68,  68,  0.10); }
+[data-theme="dark"] .tracker-row-struck  { background: rgba(249, 115, 22,  0.11); }
+[data-theme="dark"] .tracker-row-resigned{ opacity: 0.5; }
+[data-theme="dark"] .tracker-row-demoted { background: rgba(113, 113, 122, 0.08); }
+
+/* Tracker status pills */
+.pill-tracker-passed  { background: #f0fdf4; color: #16a34a; }
+.pill-tracker-immune  { background: #f0fdfa; color: #0d9488; }
+.pill-tracker-failed  { background: #fef2f2; color: #dc2626; }
+.pill-tracker-struck  { background: #fff7ed; color: #ea580c; }
+.pill-tracker-resigned{ background: #f4f4f5; color: #71717a; }
+.pill-tracker-demoted { background: #f4f4f5; color: #71717a; }
+.pill-tracker-na      { background: #f4f4f5; color: #a1a1aa; }
+
+[data-theme="dark"] .pill-tracker-passed  { background: rgba(22, 163, 74, 0.15);  color: #4ade80; }
+[data-theme="dark"] .pill-tracker-immune  { background: rgba(13, 148, 136, 0.15); color: #2dd4bf; }
+[data-theme="dark"] .pill-tracker-failed  { background: rgba(220, 38, 38, 0.15);  color: #f87171; }
+[data-theme="dark"] .pill-tracker-struck  { background: rgba(234, 88, 12, 0.15);  color: #fb923c; }
+[data-theme="dark"] .pill-tracker-resigned{ background: rgba(113,113,122, 0.12);  color: #71717a; }
+[data-theme="dark"] .pill-tracker-demoted { background: rgba(113,113,122, 0.12);  color: #71717a; }
+[data-theme="dark"] .pill-tracker-na      { background: rgba(161,161,170, 0.10);  color: #52525b; }
+
+/* Edit entry modal stats grid */
+.tracker-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.tracker-stat-cell .form-label {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.tracker-stat-cell .form-input {
+  padding: 6px 10px;
+  font-size: 13px;
+}

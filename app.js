@@ -8,6 +8,7 @@ let pendingEmail = '';
 
 const STATUS_CYCLE = ['To Do', 'In Progress', 'Review', 'Stuck', 'Done'];
 const INVOICE_STATUS_CYCLE = ['Pending', 'Paid', 'Overdue'];
+const TRACKER_STATUS_CYCLE = ['N/A', 'PASSED', 'FAILED', 'STRUCK', 'IMMUNE', 'RESIGNED', 'DEMOTED'];
 
 const AVATAR_COLORS = [
   '#6366f1','#ec4899','#14b8a6','#f59e0b',
@@ -38,6 +39,9 @@ const state = {
 
   channels: [],
   activeChannel: null,
+
+  trackerMonths: [],
+  activeTrackerMonth: null,
 
   profiles: {},
 
@@ -127,6 +131,31 @@ function statusPillClass(status) {
 function nextStatus(current, cycle) {
   const i = cycle.indexOf(current);
   return cycle[(i + 1) % cycle.length];
+}
+
+function trackerStatusPillClass(status) {
+  const map = {
+    'PASSED':  'pill-tracker-passed',
+    'IMMUNE':  'pill-tracker-immune',
+    'FAILED':  'pill-tracker-failed',
+    'STRUCK':  'pill-tracker-struck',
+    'RESIGNED':'pill-tracker-resigned',
+    'DEMOTED': 'pill-tracker-demoted',
+    'N/A':     'pill-tracker-na',
+  };
+  return map[status] || 'pill-tracker-na';
+}
+
+function trackerRowClass(status) {
+  const map = {
+    'PASSED':  'tracker-row-passed',
+    'IMMUNE':  'tracker-row-immune',
+    'FAILED':  'tracker-row-failed',
+    'STRUCK':  'tracker-row-struck',
+    'RESIGNED':'tracker-row-resigned',
+    'DEMOTED': 'tracker-row-demoted',
+  };
+  return map[status] || '';
 }
 
 function todayISO() {
@@ -346,6 +375,8 @@ async function initApp() {
     state.members   = data.members;
     state.channels  = data.channels || [];
     state.activeChannel = state.channels[0]?.id || null;
+    state.trackerMonths = data.trackerMonths || [];
+    state.activeTrackerMonth = state.trackerMonths[0]?.id || null;
     state.profiles  = data.profiles || {};
   } catch (e) {
     console.error('Failed to load data:', e);
@@ -361,7 +392,6 @@ async function initApp() {
 
 function bindAppEvents() {
   document.getElementById('theme-btn').addEventListener('click', toggleTheme);
-  document.getElementById('new-meeting-btn').addEventListener('click', openNewMeetingModal);
 
   // Nav clicks
   document.getElementById('sidebar-nav').addEventListener('click', e => {
@@ -420,12 +450,13 @@ function navigate(view, skipAnim) {
 function renderView() {
   const wrap = document.getElementById('view-wrap');
   const views = {
-    overview: renderOverview,
-    projects: renderProjects,
-    meetings: renderMeetings,
-    invoices:    renderInvoices,
-    members:     renderMembers,
-    statistics:  renderStatistics,
+    overview:   renderOverview,
+    projects:   renderProjects,
+    meetings:   renderMeetings,
+    invoices:   renderInvoices,
+    members:    renderMembers,
+    statistics: renderStatistics,
+    tracker:    renderTracker,
   };
   wrap.innerHTML = (views[state.view] || renderOverview)();
   afterRender();
@@ -614,6 +645,127 @@ function initCharts() {
       },
     });
   });
+}
+
+// ══════════════════════════════════════════════════
+//  TRACKER PAGE
+// ══════════════════════════════════════════════════
+
+function renderTracker() {
+  const months = state.trackerMonths;
+  const activeId = state.activeTrackerMonth;
+  const active = months.find(m => m.id === activeId) || months[0] || null;
+
+  return `
+    <div class="page-header">
+      <div class="page-title-block">
+        <h1 class="page-title">Tracker</h1>
+      </div>
+      <button class="btn-primary btn-sm" data-action="new-tracker-month">+ New Month</button>
+    </div>
+
+    ${months.length === 0
+      ? `<div class="empty-state"><div class="empty-state-icon">📋</div><p class="empty-state-text">No months yet. Create one to start tracking staff.</p></div>`
+      : `
+        <div class="channel-tabs">
+          ${months.map(m => `
+            <button class="channel-tab ${m.id === (active?.id) ? 'active' : ''}" data-action="select-tracker-month" data-month-id="${m.id}">
+              ${m.name}
+              <span class="channel-tab-close" data-action="delete-tracker-month" data-month-id="${m.id}">✕</span>
+            </button>
+          `).join('')}
+        </div>
+        ${active ? renderTrackerMonthContent(active) : ''}
+      `
+    }
+  `;
+}
+
+function renderTrackerMonthContent(month) {
+  return `
+    <div class="channel-content">
+      <div class="channel-content-header">
+        <span class="channel-content-title">${month.name}</span>
+        <button class="btn-ghost btn-sm" data-action="new-tracker-entry" data-month-id="${month.id}">+ Add Entry</button>
+      </div>
+      ${month.entries.length === 0
+        ? `<div class="empty-state"><div class="empty-state-icon">👤</div><p class="empty-state-text">No entries yet. Add staff members to start tracking.</p></div>`
+        : `
+          <div class="tracker-table-wrap">
+            <table class="tracker-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Roblox ID</th>
+                  <th>Dept</th>
+                  <th title="Observations">Obs</th>
+                  <th title="Playtime (hrs)">PT</th>
+                  <th title="Applications">Apps</th>
+                  <th title="Appeals">Apls</th>
+                  <th title="Banishments">Bans</th>
+                  <th title="Staff Reports">SR</th>
+                  <th title="Staff Meetings">SM</th>
+                  <th title="Messages">Msgs</th>
+                  <th title="Strikes">Str</th>
+                  <th>Status</th>
+                  <th>Robux</th>
+                  <th>Notes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${month.entries.map(e => renderTrackerEntry(e, month.id)).join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+      }
+    </div>
+  `;
+}
+
+function renderTrackerEntry(entry, monthId) {
+  const rowCls = trackerRowClass(entry.status);
+  const hasNotes = !!(entry.notes && entry.notes.trim());
+  return `
+    <tr class="tracker-entry-row ${rowCls}">
+      <td class="tracker-username">${entry.username}</td>
+      <td class="text-muted text-sm tracker-mono">${entry.robloxId || '—'}</td>
+      <td>${entry.department
+        ? `<span class="tracker-dept-badge">${entry.department}</span>`
+        : `<span class="text-muted">—</span>`}</td>
+      <td class="tracker-num">${entry.observations}</td>
+      <td class="tracker-num">${entry.playtime}</td>
+      <td class="tracker-num">${entry.applications}</td>
+      <td class="tracker-num">${entry.appeals}</td>
+      <td class="tracker-num">${entry.banishments}</td>
+      <td class="tracker-num">${entry.staffReports}</td>
+      <td class="tracker-num">${entry.staffMeetings}</td>
+      <td class="tracker-num">${entry.messages}</td>
+      <td class="tracker-num">${entry.strikes}</td>
+      <td>
+        <span class="status-pill ${trackerStatusPillClass(entry.status)}"
+              data-action="cycle-tracker-status"
+              data-entry-id="${entry.id}"
+              data-month-id="${monthId}"
+              style="cursor:pointer">${entry.status}</span>
+      </td>
+      <td class="tracker-num">${entry.robux > 0 ? Number(entry.robux).toLocaleString() : '—'}</td>
+      <td>
+        <button class="tracker-notes-btn ${hasNotes ? 'has-notes' : ''}"
+                data-action="tracker-notes"
+                data-entry-id="${entry.id}"
+                data-month-id="${monthId}"
+                title="${hasNotes ? 'View notes' : 'Add notes'}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </button>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="icon-btn" data-action="edit-tracker-entry" data-entry-id="${entry.id}" data-month-id="${monthId}" title="Edit">${PENCIL_ICON}</button>
+        <button class="delete-btn" data-action="delete-tracker-entry" data-entry-id="${entry.id}" data-month-id="${monthId}" title="Remove">×</button>
+      </td>
+    </tr>
+  `;
 }
 
 // ══════════════════════════════════════════════════
@@ -1393,6 +1545,81 @@ async function handleMainClick(e) {
         renderView();
         api('/api/charts', 'DELETE', { id: chartId }).catch(console.error);
       });
+      break;
+    }
+
+    case 'new-tracker-month': {
+      openNewTrackerMonthModal();
+      break;
+    }
+
+    case 'select-tracker-month': {
+      state.activeTrackerMonth = el.dataset.monthId;
+      renderView();
+      break;
+    }
+
+    case 'delete-tracker-month': {
+      const trkMonthId = el.dataset.monthId;
+      const trkMonth = state.trackerMonths.find(m => m.id === trkMonthId);
+      if (!trkMonth) return;
+      e.stopPropagation();
+      openDeleteConfirm(`Delete "${trkMonth.name}" and all its entries?`, async () => {
+        state.trackerMonths = state.trackerMonths.filter(m => m.id !== trkMonthId);
+        if (state.activeTrackerMonth === trkMonthId) state.activeTrackerMonth = state.trackerMonths[0]?.id || null;
+        renderView();
+        api('/api/tracker-months', 'DELETE', { id: trkMonthId }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'new-tracker-entry': {
+      openNewTrackerEntryModal(el.dataset.monthId);
+      break;
+    }
+
+    case 'edit-tracker-entry': {
+      const trkMid = el.dataset.monthId;
+      const trkEid = el.dataset.entryId;
+      const trkMo = state.trackerMonths.find(m => m.id === trkMid);
+      const trkEn = trkMo?.entries.find(e => e.id === trkEid);
+      if (trkEn && trkMo) openEditTrackerEntryModal(trkEn, trkMo);
+      break;
+    }
+
+    case 'delete-tracker-entry': {
+      const trkMid = el.dataset.monthId;
+      const trkEid = el.dataset.entryId;
+      const trkMo = state.trackerMonths.find(m => m.id === trkMid);
+      const trkEn = trkMo?.entries.find(e => e.id === trkEid);
+      if (!trkEn) return;
+      openDeleteConfirm(`Remove "${trkEn.username}" from ${trkMo.name}?`, async () => {
+        trkMo.entries = trkMo.entries.filter(e => e.id !== trkEid);
+        renderView();
+        api('/api/tracker-entries', 'DELETE', { id: trkEid }).catch(console.error);
+      });
+      break;
+    }
+
+    case 'cycle-tracker-status': {
+      const trkMid = el.dataset.monthId;
+      const trkEid = el.dataset.entryId;
+      const trkMo = state.trackerMonths.find(m => m.id === trkMid);
+      const trkEn = trkMo?.entries.find(e => e.id === trkEid);
+      if (trkEn) {
+        trkEn.status = nextStatus(trkEn.status, TRACKER_STATUS_CYCLE);
+        renderView();
+        api('/api/tracker-entries', 'PATCH', { id: trkEid, status: trkEn.status }).catch(console.error);
+      }
+      break;
+    }
+
+    case 'tracker-notes': {
+      const trkMid = el.dataset.monthId;
+      const trkEid = el.dataset.entryId;
+      const trkMo = state.trackerMonths.find(m => m.id === trkMid);
+      const trkEn = trkMo?.entries.find(e => e.id === trkEid);
+      if (trkEn && trkMo) openTrackerNotesModal(trkEn, trkMo);
       break;
     }
   }
@@ -2419,6 +2646,221 @@ async function confirmNewChart(channelId) {
 
   closeModal();
   renderView();
+}
+
+// ── Tracker Modals ────────────────────────────────
+
+function openNewTrackerMonthModal() {
+  const now = new Date();
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">New Month</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row-grid">
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Month</label>
+          <select class="form-select" id="tm-month">
+            ${MONTHS.map((m, i) => {
+              const val = String(i + 1).padStart(2, '0');
+              return `<option value="${val}" ${i === now.getMonth() ? 'selected' : ''}>${m}</option>`;
+            }).join('')}
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Year</label>
+          <input type="number" class="form-input" id="tm-year" value="${now.getFullYear()}" min="2020" max="2100" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmNewTrackerMonth()">Create</button>
+    </div>
+  `);
+}
+
+async function confirmNewTrackerMonth() {
+  const monthVal = document.getElementById('tm-month')?.value;
+  const yearVal  = document.getElementById('tm-year')?.value;
+  if (!monthVal || !yearVal) return;
+  const name = MONTHS[parseInt(monthVal) - 1] + ' ' + yearVal;
+  try {
+    const month = await api('/api/tracker-months', 'POST', { name });
+    state.trackerMonths.push(month);
+    state.activeTrackerMonth = month.id;
+  } catch (err) { console.error(err); return; }
+  closeModal();
+  renderView();
+}
+
+function openNewTrackerEntryModal(monthId) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Add Entry</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-input" id="tracker-username" placeholder="Roblox username" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmNewTrackerEntry('${monthId}')">Add Entry</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('tracker-username')?.focus(), 50);
+}
+
+async function confirmNewTrackerEntry(monthId) {
+  const username = document.getElementById('tracker-username')?.value.trim();
+  if (!username) {
+    const el = document.getElementById('tracker-username');
+    if (el) el.style.borderColor = 'var(--urgent)';
+    return;
+  }
+  try {
+    const entry = await api('/api/tracker-entries', 'POST', { monthId, username });
+    const month = state.trackerMonths.find(m => m.id === monthId);
+    if (month) month.entries.push(entry);
+  } catch (err) { console.error(err); return; }
+  closeModal();
+  renderView();
+}
+
+function openEditTrackerEntryModal(entry, month) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Edit — ${entry.username}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row-grid">
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Username</label>
+          <input type="text" class="form-input" id="te-username" value="${entry.username}" />
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Roblox ID</label>
+          <input type="text" class="form-input" id="te-robloxid" value="${entry.robloxId || ''}" />
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:14px">
+        <label class="form-label">Department</label>
+        <input type="text" class="form-input" id="te-dept" value="${entry.department || ''}" placeholder="e.g. HR, Admin, Moderation" list="te-dept-list" />
+        <datalist id="te-dept-list">
+          <option value="HR"><option value="Admin"><option value="Moderation"><option value="Support"><option value="Development"><option value="Management">
+        </datalist>
+      </div>
+      <div class="form-label" style="margin:14px 0 10px">Statistics</div>
+      <div class="tracker-stats-grid">
+        ${[
+          ['Observations', 'te-obs',     entry.observations],
+          ['Playtime',     'te-pt',      entry.playtime],
+          ['Applications', 'te-apps',    entry.applications],
+          ['Appeals',      'te-apls',    entry.appeals],
+          ['Banishments',  'te-bans',    entry.banishments],
+          ['Staff Reports','te-sr',      entry.staffReports],
+          ['Staff Meetings','te-sm',     entry.staffMeetings],
+          ['Messages',     'te-msgs',    entry.messages],
+          ['Strikes',      'te-strikes', entry.strikes],
+        ].map(([lbl, id, val]) => `
+          <div class="tracker-stat-cell">
+            <label class="form-label">${lbl}</label>
+            <input type="number" class="form-input" id="${id}" value="${val}" min="0" step="any" />
+          </div>
+        `).join('')}
+      </div>
+      <div class="form-row-grid" style="margin-top:14px">
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="te-status">
+            ${TRACKER_STATUS_CYCLE.map(s => `<option value="${s}" ${entry.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Robux</label>
+          <input type="number" class="form-input" id="te-robux" value="${entry.robux}" min="0" />
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:14px">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input" id="te-notes" rows="3" placeholder="Any notes about this staff member…" style="resize:vertical">${entry.notes || ''}</textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditTrackerEntry('${entry.id}','${month.id}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('te-username')?.focus(), 50);
+}
+
+async function confirmEditTrackerEntry(entryId, monthId) {
+  const username     = document.getElementById('te-username')?.value.trim();
+  if (!username) return;
+  const robloxId     = document.getElementById('te-robloxid')?.value.trim() || '';
+  const department   = document.getElementById('te-dept')?.value.trim() || '';
+  const observations = parseFloat(document.getElementById('te-obs')?.value) || 0;
+  const playtime     = parseFloat(document.getElementById('te-pt')?.value)  || 0;
+  const applications = parseFloat(document.getElementById('te-apps')?.value)|| 0;
+  const appeals      = parseFloat(document.getElementById('te-apls')?.value)|| 0;
+  const banishments  = parseFloat(document.getElementById('te-bans')?.value)|| 0;
+  const staffReports = parseFloat(document.getElementById('te-sr')?.value)  || 0;
+  const staffMeetings= parseFloat(document.getElementById('te-sm')?.value)  || 0;
+  const messages     = parseFloat(document.getElementById('te-msgs')?.value)|| 0;
+  const strikes      = parseFloat(document.getElementById('te-strikes')?.value)||0;
+  const status       = document.getElementById('te-status')?.value || 'N/A';
+  const robux        = parseFloat(document.getElementById('te-robux')?.value) || 0;
+  const notes        = document.getElementById('te-notes')?.value || '';
+
+  const month = state.trackerMonths.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (entry) {
+    Object.assign(entry, { username, robloxId, department, observations, playtime, applications, appeals, banishments, staffReports, staffMeetings, messages, strikes, status, robux, notes });
+  }
+  closeModal();
+  renderView();
+  api('/api/tracker-entries', 'PATCH', {
+    id: entryId,
+    username, roblox_id: robloxId, department,
+    observations, playtime, applications, appeals, banishments,
+    staff_reports: staffReports, staff_meetings: staffMeetings,
+    messages, strikes, status, robux, notes,
+  }).catch(console.error);
+}
+
+function openTrackerNotesModal(entry, month) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Notes — ${entry.username}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted text-sm" style="margin-bottom:12px">${month.name}</p>
+      <textarea class="form-input" id="tracker-notes-input" rows="6"
+                placeholder="Add notes about this staff member…"
+                style="resize:vertical">${entry.notes || ''}</textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmTrackerNotes('${entry.id}','${month.id}')">Save Notes</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('tracker-notes-input')?.focus(), 50);
+}
+
+async function confirmTrackerNotes(entryId, monthId) {
+  const notes = document.getElementById('tracker-notes-input')?.value || '';
+  const month = state.trackerMonths.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (entry) entry.notes = notes;
+  closeModal();
+  renderView();
+  api('/api/tracker-entries', 'PATCH', { id: entryId, notes }).catch(console.error);
 }
 
 // ══════════════════════════════════════════════════
