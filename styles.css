@@ -1780,11 +1780,11 @@ tr:hover .delete-btn,
   vertical-align: bottom;
 }
 
-.tracker-table th:first-child { width: 14%; }
-.tracker-table th:nth-child(2) { width: 7%; }
-.tracker-table th:nth-child(n+3):nth-child(-n+11) { width: 7%; text-align: right; }
+.tracker-table th:first-child { width: 12%; }
+.tracker-table th:nth-child(2) { width: 6%; }
+.tracker-table th:nth-child(n+3):nth-child(-n+11) { width: 6.5%; text-align: right; }
 .tracker-table th:nth-child(12) { width: 9%; }
-.tracker-table th:last-child { width: 7%; }
+.tracker-table th:last-child { width: 10%; }
 
 .tracker-table td {
   padding: 7px 6px;
