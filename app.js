@@ -214,7 +214,7 @@ function groupByRank(entries) {
 }
 
 function renderRankHeaderRow(rank) {
-  return `<tr class="tracker-rank-header ${rankHeaderClass(rank)}"><td colspan="14">${rank}</td></tr>`;
+  return `<tr class="tracker-rank-header ${rankHeaderClass(rank)}"><td colspan="13">${rank}</td></tr>`;
 }
 
 function onTrackerStatusChange(el, entryId, monthId) {
@@ -782,17 +782,16 @@ function renderTrackerMonthContent(month) {
                   <thead>
                     <tr>
                       <th>Username</th>
-                      <th>Roblox ID</th>
                       <th>Tags</th>
-                      <th title="Observations">Obs</th>
-                      <th title="Playtime (hrs)">PT</th>
-                      <th title="Applications">Apps</th>
-                      <th title="Appeals">Apls</th>
-                      <th title="Banishments">Bans</th>
-                      <th title="Staff Reports">SR</th>
-                      <th title="Staff Meetings">SM</th>
-                      <th title="Messages">Msgs</th>
-                      <th title="Strikes">Str</th>
+                      <th>Observations</th>
+                      <th>Playtime</th>
+                      <th>Applications</th>
+                      <th>Appeals</th>
+                      <th>Banishments</th>
+                      <th>Staff Reports</th>
+                      <th>Staff Meetings</th>
+                      <th>Messages</th>
+                      <th>Strikes</th>
                       <th>Status</th>
                       <th></th>
                     </tr>
@@ -813,7 +812,6 @@ function renderTrackerEntry(entry, monthId) {
   return `
     <tr class="tracker-entry-row ${rowCls}">
       <td class="tracker-username">${entry.username}</td>
-      <td class="text-muted text-sm tracker-mono">${entry.robloxId || '—'}</td>
       <td>${(entry.deptTags || '').split(',').map(t => t.trim()).filter(Boolean).map(t => `<span class="tracker-tag-badge">${t}</span>`).join(' ')}</td>
       <td class="tracker-num">${entry.observations}</td>
       <td class="tracker-num">${entry.playtime}</td>
