@@ -783,14 +783,14 @@ function renderTrackerMonthContent(month) {
                     <tr>
                       <th>Username</th>
                       <th>Tags</th>
-                      <th>Observations</th>
+                      <th>Obs</th>
                       <th>Playtime</th>
-                      <th>Applications</th>
+                      <th>Apps</th>
                       <th>Appeals</th>
-                      <th>Banishments</th>
-                      <th>Staff Reports</th>
-                      <th>Staff Meetings</th>
-                      <th>Messages</th>
+                      <th>Bans</th>
+                      <th>Reports</th>
+                      <th>Meetings</th>
+                      <th>Msgs</th>
                       <th>Strikes</th>
                       <th>Status</th>
                       <th></th>
