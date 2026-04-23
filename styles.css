@@ -1790,8 +1790,6 @@ tr:hover .delete-btn,
   padding: 7px 6px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .tracker-entry-row:last-child td {
