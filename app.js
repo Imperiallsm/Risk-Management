@@ -188,16 +188,33 @@ function rankBadgeClass(rank) {
   return map[rank] || '';
 }
 
-function renderRankCell(entry) {
-  const rank = entry.department || '';
-  const tags = (entry.deptTags || '').split(',').map(t => t.trim()).filter(Boolean);
-  const rankBadge = rank
-    ? `<span class="tracker-rank-badge ${rankBadgeClass(rank)}">${rank}</span>`
-    : `<span class="text-muted">—</span>`;
-  const tagRow = tags.length
-    ? `<div class="tracker-tags-row">${tags.map(t => `<span class="tracker-tag-badge">${t}</span>`).join('')}</div>`
-    : '';
-  return `<div class="tracker-rank-cell">${rankBadge}${tagRow}</div>`;
+function rankHeaderClass(rank) {
+  const map = {
+    'Director':           'rank-header-director',
+    'Community Manager':  'rank-header-comm-mgr',
+    'Head Administrator': 'rank-header-head-admin',
+    'Administrator':      'rank-header-admin',
+  };
+  return map[rank] || '';
+}
+
+function groupByRank(entries) {
+  const groups = [];
+  const seen = new Map();
+  for (const e of entries) {
+    const rank = e.department || '';
+    if (!seen.has(rank)) {
+      const g = { rank, entries: [] };
+      seen.set(rank, g);
+      groups.push(g);
+    }
+    seen.get(rank).entries.push(e);
+  }
+  return groups;
+}
+
+function renderRankHeaderRow(rank) {
+  return `<tr class="tracker-rank-header ${rankHeaderClass(rank)}"><td colspan="14">${rank}</td></tr>`;
 }
 
 function onTrackerStatusChange(el, entryId, monthId) {
@@ -754,6 +771,11 @@ function renderTrackerMonthContent(month) {
               const ri = rankSortIndex(a.department) - rankSortIndex(b.department);
               return ri !== 0 ? ri : a.username.localeCompare(b.username);
             });
+            const groups = groupByRank(sorted);
+            const bodyRows = groups.map(g => {
+              const header = g.rank ? renderRankHeaderRow(g.rank) : '';
+              return header + g.entries.map(e => renderTrackerEntry(e, month.id)).join('');
+            }).join('');
             return `
               <div class="tracker-table-wrap">
                 <table class="tracker-table">
@@ -761,7 +783,7 @@ function renderTrackerMonthContent(month) {
                     <tr>
                       <th>Username</th>
                       <th>Roblox ID</th>
-                      <th>Rank</th>
+                      <th>Tags</th>
                       <th title="Observations">Obs</th>
                       <th title="Playtime (hrs)">PT</th>
                       <th title="Applications">Apps</th>
@@ -775,9 +797,7 @@ function renderTrackerMonthContent(month) {
                       <th></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    ${sorted.map(e => renderTrackerEntry(e, month.id)).join('')}
-                  </tbody>
+                  <tbody>${bodyRows}</tbody>
                 </table>
               </div>
             `;
@@ -794,7 +814,7 @@ function renderTrackerEntry(entry, monthId) {
     <tr class="tracker-entry-row ${rowCls}">
       <td class="tracker-username">${entry.username}</td>
       <td class="text-muted text-sm tracker-mono">${entry.robloxId || '—'}</td>
-      <td>${renderRankCell(entry)}</td>
+      <td>${(entry.deptTags || '').split(',').map(t => t.trim()).filter(Boolean).map(t => `<span class="tracker-tag-badge">${t}</span>`).join(' ')}</td>
       <td class="tracker-num">${entry.observations}</td>
       <td class="tracker-num">${entry.playtime}</td>
       <td class="tracker-num">${entry.applications}</td>

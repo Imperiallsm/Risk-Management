@@ -1889,34 +1889,29 @@ tr:hover .delete-btn,
   font-size: 13px;
 }
 
-/* Rank badges */
-.tracker-rank-cell { display: flex; flex-direction: column; gap: 4px; }
-
-.tracker-rank-badge {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 5px;
+/* Rank group header rows */
+.tracker-rank-header td {
+  padding: 7px 12px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
 }
 
-.rank-director    { background: #fef3c7; color: #92400e; }
-.rank-comm-mgr    { background: #fce7f3; color: #9d174d; }
-.rank-head-admin  { background: #f5f3ff; color: #5b21b6; }
-.rank-admin       { background: #eff6ff; color: #1e40af; }
+.rank-header-director td  { background: rgba(251,191,36,0.08); border-left: 3px solid #d97706; color: #92400e; }
+.rank-header-comm-mgr td  { background: rgba(236,72,153,0.08); border-left: 3px solid #db2777; color: #9d174d; }
+.rank-header-head-admin td{ background: rgba(139,92,246,0.08); border-left: 3px solid #7c3aed; color: #5b21b6; }
+.rank-header-admin td     { background: rgba(59,130,246,0.08); border-left: 3px solid #1d4ed8; color: #1e40af; }
 
-[data-theme="dark"] .rank-director   { background: rgba(251,191,36,0.15);  color: #fbbf24; }
-[data-theme="dark"] .rank-comm-mgr   { background: rgba(236,72,153,0.15);  color: #f472b6; }
-[data-theme="dark"] .rank-head-admin { background: rgba(139,92,246,0.15);  color: #a78bfa; }
-[data-theme="dark"] .rank-admin      { background: rgba(59,130,246,0.15);  color: #60a5fa; }
+[data-theme="dark"] .rank-header-director td  { background: rgba(251,191,36,0.09);  color: #fbbf24; border-left-color: #d97706; }
+[data-theme="dark"] .rank-header-comm-mgr td  { background: rgba(236,72,153,0.09);  color: #f472b6; border-left-color: #db2777; }
+[data-theme="dark"] .rank-header-head-admin td{ background: rgba(139,92,246,0.09);  color: #a78bfa; border-left-color: #7c3aed; }
+[data-theme="dark"] .rank-header-admin td     { background: rgba(59,130,246,0.09);  color: #60a5fa; border-left-color: #1d4ed8; }
 
-.tracker-tags-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-}
+
+
 
 .tracker-tag-badge {
   display: inline-block;
