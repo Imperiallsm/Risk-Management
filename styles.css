@@ -1888,3 +1888,42 @@ tr:hover .delete-btn,
   padding: 6px 10px;
   font-size: 13px;
 }
+
+/* Status select in tracker table */
+.tracker-status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  border-radius: 20px;
+  padding: 3px 20px 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  outline: none;
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+  background-size: 9px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  white-space: nowrap;
+}
+
+.tracker-status-select:focus {
+  box-shadow: 0 0 0 2px var(--border-2);
+}
+
+.trk-sel-passed  { background-color: #f0fdf4; color: #16a34a; }
+.trk-sel-immune  { background-color: #f0fdfa; color: #0d9488; }
+.trk-sel-failed  { background-color: #fef2f2; color: #dc2626; }
+.trk-sel-struck  { background-color: #fff7ed; color: #ea580c; }
+.trk-sel-resigned{ background-color: #f4f4f5; color: #71717a; }
+.trk-sel-demoted { background-color: #f4f4f5; color: #71717a; }
+.trk-sel-na      { background-color: #f4f4f5; color: #a1a1aa; }
+
+[data-theme="dark"] .trk-sel-passed  { background-color: rgba(22,163,74,0.15);  color: #4ade80; }
+[data-theme="dark"] .trk-sel-immune  { background-color: rgba(13,148,136,0.15); color: #2dd4bf; }
+[data-theme="dark"] .trk-sel-failed  { background-color: rgba(220,38,38,0.15);  color: #f87171; }
+[data-theme="dark"] .trk-sel-struck  { background-color: rgba(234,88,12,0.15);  color: #fb923c; }
+[data-theme="dark"] .trk-sel-resigned{ background-color: rgba(113,113,122,0.12);color: #71717a; }
+[data-theme="dark"] .trk-sel-demoted { background-color: rgba(113,113,122,0.12);color: #71717a; }
+[data-theme="dark"] .trk-sel-na      { background-color: rgba(161,161,170,0.10);color: #52525b; }

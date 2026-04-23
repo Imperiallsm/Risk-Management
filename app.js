@@ -158,6 +158,36 @@ function trackerRowClass(status) {
   return map[status] || '';
 }
 
+function trackerStatusSelectClass(status) {
+  const map = {
+    'PASSED':  'trk-sel-passed',
+    'IMMUNE':  'trk-sel-immune',
+    'FAILED':  'trk-sel-failed',
+    'STRUCK':  'trk-sel-struck',
+    'RESIGNED':'trk-sel-resigned',
+    'DEMOTED': 'trk-sel-demoted',
+    'N/A':     'trk-sel-na',
+  };
+  return map[status] || 'trk-sel-na';
+}
+
+function onTrackerStatusChange(el, entryId, monthId) {
+  const status = el.value;
+  const allCls = ['trk-sel-passed','trk-sel-immune','trk-sel-failed','trk-sel-struck','trk-sel-resigned','trk-sel-demoted','trk-sel-na'];
+  el.classList.remove(...allCls);
+  el.classList.add(trackerStatusSelectClass(status));
+  const month = state.trackerMonths.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (entry) {
+    entry.status = status;
+    const row = el.closest('tr');
+    if (row) {
+      row.className = `tracker-entry-row ${trackerRowClass(status)}`;
+    }
+  }
+  api('/api/tracker-entries', 'PATCH', { id: entryId, status }).catch(console.error);
+}
+
 function todayISO() {
   return new Date().toISOString().split('T')[0];
 }
@@ -708,7 +738,6 @@ function renderTrackerMonthContent(month) {
                   <th title="Messages">Msgs</th>
                   <th title="Strikes">Str</th>
                   <th>Status</th>
-                  <th>Robux</th>
                   <th>Notes</th>
                   <th></th>
                 </tr>
@@ -744,13 +773,11 @@ function renderTrackerEntry(entry, monthId) {
       <td class="tracker-num">${entry.messages}</td>
       <td class="tracker-num">${entry.strikes}</td>
       <td>
-        <span class="status-pill ${trackerStatusPillClass(entry.status)}"
-              data-action="cycle-tracker-status"
-              data-entry-id="${entry.id}"
-              data-month-id="${monthId}"
-              style="cursor:pointer">${entry.status}</span>
+        <select class="tracker-status-select ${trackerStatusSelectClass(entry.status)}"
+                onchange="onTrackerStatusChange(this,'${entry.id}','${monthId}')">
+          ${TRACKER_STATUS_CYCLE.map(s => `<option value="${s}" ${entry.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
       </td>
-      <td class="tracker-num">${entry.robux > 0 ? Number(entry.robux).toLocaleString() : '—'}</td>
       <td>
         <button class="tracker-notes-btn ${hasNotes ? 'has-notes' : ''}"
                 data-action="tracker-notes"
@@ -1598,19 +1625,6 @@ async function handleMainClick(e) {
         renderView();
         api('/api/tracker-entries', 'DELETE', { id: trkEid }).catch(console.error);
       });
-      break;
-    }
-
-    case 'cycle-tracker-status': {
-      const trkMid = el.dataset.monthId;
-      const trkEid = el.dataset.entryId;
-      const trkMo = state.trackerMonths.find(m => m.id === trkMid);
-      const trkEn = trkMo?.entries.find(e => e.id === trkEid);
-      if (trkEn) {
-        trkEn.status = nextStatus(trkEn.status, TRACKER_STATUS_CYCLE);
-        renderView();
-        api('/api/tracker-entries', 'PATCH', { id: trkEid, status: trkEn.status }).catch(console.error);
-      }
       break;
     }
 
@@ -2774,17 +2788,11 @@ function openEditTrackerEntryModal(entry, month) {
           </div>
         `).join('')}
       </div>
-      <div class="form-row-grid" style="margin-top:14px">
-        <div class="form-row" style="margin-bottom:0">
-          <label class="form-label">Status</label>
-          <select class="form-select" id="te-status">
-            ${TRACKER_STATUS_CYCLE.map(s => `<option value="${s}" ${entry.status === s ? 'selected' : ''}>${s}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-row" style="margin-bottom:0">
-          <label class="form-label">Robux</label>
-          <input type="number" class="form-input" id="te-robux" value="${entry.robux}" min="0" />
-        </div>
+      <div class="form-row" style="margin-top:14px">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="te-status">
+          ${TRACKER_STATUS_CYCLE.map(s => `<option value="${s}" ${entry.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
       </div>
       <div class="form-row" style="margin-top:14px">
         <label class="form-label">Notes</label>
@@ -2814,13 +2822,12 @@ async function confirmEditTrackerEntry(entryId, monthId) {
   const messages     = parseFloat(document.getElementById('te-msgs')?.value)|| 0;
   const strikes      = parseFloat(document.getElementById('te-strikes')?.value)||0;
   const status       = document.getElementById('te-status')?.value || 'N/A';
-  const robux        = parseFloat(document.getElementById('te-robux')?.value) || 0;
   const notes        = document.getElementById('te-notes')?.value || '';
 
   const month = state.trackerMonths.find(m => m.id === monthId);
   const entry = month?.entries.find(e => e.id === entryId);
   if (entry) {
-    Object.assign(entry, { username, robloxId, department, observations, playtime, applications, appeals, banishments, staffReports, staffMeetings, messages, strikes, status, robux, notes });
+    Object.assign(entry, { username, robloxId, department, observations, playtime, applications, appeals, banishments, staffReports, staffMeetings, messages, strikes, status, notes });
   }
   closeModal();
   renderView();
@@ -2829,7 +2836,7 @@ async function confirmEditTrackerEntry(entryId, monthId) {
     username, roblox_id: robloxId, department,
     observations, playtime, applications, appeals, banishments,
     staff_reports: staffReports, staff_meetings: staffMeetings,
-    messages, strikes, status, robux, notes,
+    messages, strikes, status, notes,
   }).catch(console.error);
 }
 
