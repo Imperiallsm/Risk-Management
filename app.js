@@ -738,7 +738,6 @@ function renderTrackerMonthContent(month) {
                   <th title="Messages">Msgs</th>
                   <th title="Strikes">Str</th>
                   <th>Status</th>
-                  <th>Notes</th>
                   <th></th>
                 </tr>
               </thead>
@@ -778,7 +777,7 @@ function renderTrackerEntry(entry, monthId) {
           ${TRACKER_STATUS_CYCLE.map(s => `<option value="${s}" ${entry.status === s ? 'selected' : ''}>${s}</option>`).join('')}
         </select>
       </td>
-      <td>
+      <td style="white-space:nowrap">
         <button class="tracker-notes-btn ${hasNotes ? 'has-notes' : ''}"
                 data-action="tracker-notes"
                 data-entry-id="${entry.id}"
@@ -786,8 +785,6 @@ function renderTrackerEntry(entry, monthId) {
                 title="${hasNotes ? 'View notes' : 'Add notes'}">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         </button>
-      </td>
-      <td style="white-space:nowrap">
         <button class="icon-btn" data-action="edit-tracker-entry" data-entry-id="${entry.id}" data-month-id="${monthId}" title="Edit">${PENCIL_ICON}</button>
         <button class="delete-btn" data-action="delete-tracker-entry" data-entry-id="${entry.id}" data-month-id="${monthId}" title="Remove">×</button>
       </td>

@@ -1760,7 +1760,7 @@ tr:hover .delete-btn,
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  min-width: 1060px;
+  min-width: 980px;
 }
 
 .tracker-table th {
