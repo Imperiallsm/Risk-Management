@@ -8,6 +8,7 @@ function mapEntry(e) {
     username: e.username,
     robloxId: e.roblox_id || '',
     department: e.department || '',
+    deptTags: e.dept_tags || '',
     observations: e.observations || 0,
     playtime: e.playtime || 0,
     applications: e.applications || 0,
@@ -30,7 +31,7 @@ module.exports = async (req, res) => {
     const { monthId, username } = req.body || {};
     if (!monthId || !username) return res.status(400).json({ error: 'monthId and username required' });
     const { data, error } = await sb.from('tracker_entries')
-      .insert({ month_id: monthId, username, roblox_id: '', department: '', observations: 0, playtime: 0, applications: 0, appeals: 0, banishments: 0, staff_reports: 0, staff_meetings: 0, messages: 0, strikes: 0, status: 'N/A', robux: 0, notes: '' })
+      .insert({ month_id: monthId, username, roblox_id: '', department: '', dept_tags: '', observations: 0, playtime: 0, applications: 0, appeals: 0, banishments: 0, staff_reports: 0, staff_meetings: 0, messages: 0, strikes: 0, status: 'N/A', robux: 0, notes: '' })
       .select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json(mapEntry(data));
@@ -39,7 +40,7 @@ module.exports = async (req, res) => {
   if (req.method === 'PATCH') {
     const { id, ...fields } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
-    const allowed = ['username', 'roblox_id', 'department', 'observations', 'playtime', 'applications', 'appeals', 'banishments', 'staff_reports', 'staff_meetings', 'messages', 'strikes', 'status', 'robux', 'notes'];
+    const allowed = ['username', 'roblox_id', 'department', 'dept_tags', 'observations', 'playtime', 'applications', 'appeals', 'banishments', 'staff_reports', 'staff_meetings', 'messages', 'strikes', 'status', 'robux', 'notes'];
     const updates = {};
     for (const key of allowed) {
       if (fields[key] !== undefined) updates[key] = fields[key];

@@ -86,6 +86,7 @@ module.exports = async (req, res) => {
         username: e.username,
         robloxId: e.roblox_id || '',
         department: e.department || '',
+        deptTags: e.dept_tags || '',
         observations: e.observations || 0,
         playtime: e.playtime || 0,
         applications: e.applications || 0,

@@ -9,6 +9,8 @@ let pendingEmail = '';
 const STATUS_CYCLE = ['To Do', 'In Progress', 'Review', 'Stuck', 'Done'];
 const INVOICE_STATUS_CYCLE = ['Pending', 'Paid', 'Overdue'];
 const TRACKER_STATUS_CYCLE = ['N/A', 'PASSED', 'FAILED', 'STRUCK', 'IMMUNE', 'RESIGNED', 'DEMOTED'];
+const TRACKER_RANKS = ['Director', 'Community Manager', 'Head Administrator', 'Administrator'];
+const TRACKER_SECONDARY_TAGS = ['Community', 'Management'];
 
 const AVATAR_COLORS = [
   '#6366f1','#ec4899','#14b8a6','#f59e0b',
@@ -169,6 +171,33 @@ function trackerStatusSelectClass(status) {
     'N/A':     'trk-sel-na',
   };
   return map[status] || 'trk-sel-na';
+}
+
+function rankSortIndex(rank) {
+  const i = TRACKER_RANKS.indexOf(rank);
+  return i === -1 ? TRACKER_RANKS.length : i;
+}
+
+function rankBadgeClass(rank) {
+  const map = {
+    'Director':            'rank-director',
+    'Community Manager':   'rank-comm-mgr',
+    'Head Administrator':  'rank-head-admin',
+    'Administrator':       'rank-admin',
+  };
+  return map[rank] || '';
+}
+
+function renderRankCell(entry) {
+  const rank = entry.department || '';
+  const tags = (entry.deptTags || '').split(',').map(t => t.trim()).filter(Boolean);
+  const rankBadge = rank
+    ? `<span class="tracker-rank-badge ${rankBadgeClass(rank)}">${rank}</span>`
+    : `<span class="text-muted">—</span>`;
+  const tagRow = tags.length
+    ? `<div class="tracker-tags-row">${tags.map(t => `<span class="tracker-tag-badge">${t}</span>`).join('')}</div>`
+    : '';
+  return `<div class="tracker-rank-cell">${rankBadge}${tagRow}</div>`;
 }
 
 function onTrackerStatusChange(el, entryId, monthId) {
@@ -720,33 +749,39 @@ function renderTrackerMonthContent(month) {
       </div>
       ${month.entries.length === 0
         ? `<div class="empty-state"><div class="empty-state-icon">👤</div><p class="empty-state-text">No entries yet. Add staff members to start tracking.</p></div>`
-        : `
-          <div class="tracker-table-wrap">
-            <table class="tracker-table">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Roblox ID</th>
-                  <th>Dept</th>
-                  <th title="Observations">Obs</th>
-                  <th title="Playtime (hrs)">PT</th>
-                  <th title="Applications">Apps</th>
-                  <th title="Appeals">Apls</th>
-                  <th title="Banishments">Bans</th>
-                  <th title="Staff Reports">SR</th>
-                  <th title="Staff Meetings">SM</th>
-                  <th title="Messages">Msgs</th>
-                  <th title="Strikes">Str</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${month.entries.map(e => renderTrackerEntry(e, month.id)).join('')}
-              </tbody>
-            </table>
-          </div>
-        `
+        : (() => {
+            const sorted = [...month.entries].sort((a, b) => {
+              const ri = rankSortIndex(a.department) - rankSortIndex(b.department);
+              return ri !== 0 ? ri : a.username.localeCompare(b.username);
+            });
+            return `
+              <div class="tracker-table-wrap">
+                <table class="tracker-table">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Roblox ID</th>
+                      <th>Rank</th>
+                      <th title="Observations">Obs</th>
+                      <th title="Playtime (hrs)">PT</th>
+                      <th title="Applications">Apps</th>
+                      <th title="Appeals">Apls</th>
+                      <th title="Banishments">Bans</th>
+                      <th title="Staff Reports">SR</th>
+                      <th title="Staff Meetings">SM</th>
+                      <th title="Messages">Msgs</th>
+                      <th title="Strikes">Str</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${sorted.map(e => renderTrackerEntry(e, month.id)).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `;
+          })()
       }
     </div>
   `;
@@ -759,9 +794,7 @@ function renderTrackerEntry(entry, monthId) {
     <tr class="tracker-entry-row ${rowCls}">
       <td class="tracker-username">${entry.username}</td>
       <td class="text-muted text-sm tracker-mono">${entry.robloxId || '—'}</td>
-      <td>${entry.department
-        ? `<span class="tracker-dept-badge">${entry.department}</span>`
-        : `<span class="text-muted">—</span>`}</td>
+      <td>${renderRankCell(entry)}</td>
       <td class="tracker-num">${entry.observations}</td>
       <td class="tracker-num">${entry.playtime}</td>
       <td class="tracker-num">${entry.applications}</td>
@@ -2760,11 +2793,22 @@ function openEditTrackerEntryModal(entry, month) {
         </div>
       </div>
       <div class="form-row" style="margin-top:14px">
-        <label class="form-label">Department</label>
-        <input type="text" class="form-input" id="te-dept" value="${entry.department || ''}" placeholder="e.g. HR, Admin, Moderation" list="te-dept-list" />
-        <datalist id="te-dept-list">
-          <option value="HR"><option value="Admin"><option value="Moderation"><option value="Support"><option value="Development"><option value="Management">
-        </datalist>
+        <label class="form-label">Rank</label>
+        <select class="form-select" id="te-rank">
+          <option value="">— None —</option>
+          ${TRACKER_RANKS.map(r => `<option value="${r}" ${entry.department === r ? 'selected' : ''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row" style="margin-top:10px">
+        <label class="form-label">Secondary Tags</label>
+        <div class="tracker-tag-checks">
+          ${TRACKER_SECONDARY_TAGS.map(t => `
+            <label class="tracker-tag-check">
+              <input type="checkbox" id="te-tag-${t.toLowerCase()}" ${(entry.deptTags || '').includes(t) ? 'checked' : ''} />
+              ${t}
+            </label>
+          `).join('')}
+        </div>
       </div>
       <div class="form-label" style="margin:14px 0 10px">Statistics</div>
       <div class="tracker-stats-grid">
@@ -2808,7 +2852,8 @@ async function confirmEditTrackerEntry(entryId, monthId) {
   const username     = document.getElementById('te-username')?.value.trim();
   if (!username) return;
   const robloxId     = document.getElementById('te-robloxid')?.value.trim() || '';
-  const department   = document.getElementById('te-dept')?.value.trim() || '';
+  const department   = document.getElementById('te-rank')?.value || '';
+  const deptTags     = TRACKER_SECONDARY_TAGS.filter(t => document.getElementById(`te-tag-${t.toLowerCase()}`)?.checked).join(',');
   const observations = parseFloat(document.getElementById('te-obs')?.value) || 0;
   const playtime     = parseFloat(document.getElementById('te-pt')?.value)  || 0;
   const applications = parseFloat(document.getElementById('te-apps')?.value)|| 0;
@@ -2824,13 +2869,13 @@ async function confirmEditTrackerEntry(entryId, monthId) {
   const month = state.trackerMonths.find(m => m.id === monthId);
   const entry = month?.entries.find(e => e.id === entryId);
   if (entry) {
-    Object.assign(entry, { username, robloxId, department, observations, playtime, applications, appeals, banishments, staffReports, staffMeetings, messages, strikes, status, notes });
+    Object.assign(entry, { username, robloxId, department, deptTags, observations, playtime, applications, appeals, banishments, staffReports, staffMeetings, messages, strikes, status, notes });
   }
   closeModal();
   renderView();
   api('/api/tracker-entries', 'PATCH', {
     id: entryId,
-    username, roblox_id: robloxId, department,
+    username, roblox_id: robloxId, department, dept_tags: deptTags,
     observations, playtime, applications, appeals, banishments,
     staff_reports: staffReports, staff_meetings: staffMeetings,
     messages, strikes, status, notes,

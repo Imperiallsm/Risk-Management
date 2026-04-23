@@ -1889,6 +1889,69 @@ tr:hover .delete-btn,
   font-size: 13px;
 }
 
+/* Rank badges */
+.tracker-rank-cell { display: flex; flex-direction: column; gap: 4px; }
+
+.tracker-rank-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.rank-director    { background: #fef3c7; color: #92400e; }
+.rank-comm-mgr    { background: #fce7f3; color: #9d174d; }
+.rank-head-admin  { background: #f5f3ff; color: #5b21b6; }
+.rank-admin       { background: #eff6ff; color: #1e40af; }
+
+[data-theme="dark"] .rank-director   { background: rgba(251,191,36,0.15);  color: #fbbf24; }
+[data-theme="dark"] .rank-comm-mgr   { background: rgba(236,72,153,0.15);  color: #f472b6; }
+[data-theme="dark"] .rank-head-admin { background: rgba(139,92,246,0.15);  color: #a78bfa; }
+[data-theme="dark"] .rank-admin      { background: rgba(59,130,246,0.15);  color: #60a5fa; }
+
+.tracker-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.tracker-tag-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* Tag checkboxes in edit modal */
+.tracker-tag-checks {
+  display: flex;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+.tracker-tag-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.tracker-tag-check input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
 /* Status select in tracker table */
 .tracker-status-select {
   appearance: none;
