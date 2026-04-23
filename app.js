@@ -813,15 +813,19 @@ function renderTrackerEntry(entry, monthId) {
     <tr class="tracker-entry-row ${rowCls}">
       <td class="tracker-username">${entry.username}</td>
       <td>${(entry.deptTags || '').split(',').map(t => t.trim()).filter(Boolean).map(t => `<span class="tracker-tag-badge">${t}</span>`).join(' ')}</td>
-      <td class="tracker-num">${entry.observations}</td>
-      <td class="tracker-num">${entry.playtime}</td>
-      <td class="tracker-num">${entry.applications}</td>
-      <td class="tracker-num">${entry.appeals}</td>
-      <td class="tracker-num">${entry.banishments}</td>
-      <td class="tracker-num">${entry.staffReports}</td>
-      <td class="tracker-num">${entry.staffMeetings}</td>
-      <td class="tracker-num">${entry.messages}</td>
-      <td class="tracker-num">${entry.strikes}</td>
+      ${[
+        ['observations',  'observations',  entry.observations],
+        ['playtime',      'playtime',      entry.playtime],
+        ['applications',  'applications',  entry.applications],
+        ['appeals',       'appeals',       entry.appeals],
+        ['banishments',   'banishments',   entry.banishments],
+        ['staffReports',  'staff_reports', entry.staffReports],
+        ['staffMeetings', 'staff_meetings',entry.staffMeetings],
+        ['messages',      'messages',      entry.messages],
+        ['strikes',       'strikes',       entry.strikes],
+      ].map(([field, apiField, val]) =>
+        `<td class="tracker-num tracker-editable" data-action="inline-tracker-num" data-field="${field}" data-api-field="${apiField}" data-entry-id="${entry.id}" data-month-id="${monthId}">${val}</td>`
+      ).join('')}
       <td>
         <select class="tracker-status-select ${trackerStatusSelectClass(entry.status)}"
                 onchange="onTrackerStatusChange(this,'${entry.id}','${monthId}')">
@@ -1682,6 +1686,47 @@ async function handleMainClick(e) {
       const trkMo = state.trackerMonths.find(m => m.id === trkMid);
       const trkEn = trkMo?.entries.find(e => e.id === trkEid);
       if (trkEn && trkMo) openTrackerNotesModal(trkEn, trkMo);
+      break;
+    }
+
+    case 'inline-tracker-num': {
+      if (el.querySelector('input')) return;
+      const field    = el.dataset.field;
+      const apiField = el.dataset.apiField;
+      const entryId  = el.dataset.entryId;
+      const monthId  = el.dataset.monthId;
+      const origText = el.textContent.trim();
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = origText;
+      input.min = '0';
+      input.step = 'any';
+      input.className = 'tracker-inline-input';
+      el.textContent = '';
+      el.appendChild(input);
+      input.focus();
+      input.select();
+
+      let done = false;
+      const save = () => {
+        if (done) return; done = true;
+        const newVal = parseFloat(input.value) || 0;
+        el.textContent = newVal;
+        const mo = state.trackerMonths.find(m => m.id === monthId);
+        const en = mo?.entries.find(e => e.id === entryId);
+        if (en) en[field] = newVal;
+        api('/api/tracker-entries', 'PATCH', { id: entryId, [apiField]: newVal }).catch(console.error);
+      };
+      const cancel = () => {
+        if (done) return; done = true;
+        el.textContent = origText;
+      };
+      input.addEventListener('blur', save);
+      input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
+        if (ev.key === 'Escape') { input.removeEventListener('blur', save); cancel(); }
+      });
       break;
     }
   }

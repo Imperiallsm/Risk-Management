@@ -1750,38 +1750,48 @@ tr:hover .delete-btn,
 ══════════════════════════════════════════════════ */
 
 .tracker-table-wrap {
-  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   margin-top: 12px;
+  overflow: hidden;
 }
 
 .tracker-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  min-width: 980px;
+  table-layout: fixed;
 }
 
 .tracker-table th {
-  padding: 8px 10px;
+  padding: 8px 6px;
   text-align: left;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
   background: var(--surface);
   position: sticky;
   top: 0;
+  vertical-align: bottom;
 }
 
+.tracker-table th:first-child { width: 14%; }
+.tracker-table th:nth-child(2) { width: 7%; }
+.tracker-table th:nth-child(n+3):nth-child(-n+11) { width: 7%; text-align: right; }
+.tracker-table th:nth-child(12) { width: 9%; }
+.tracker-table th:last-child { width: 7%; }
+
 .tracker-table td {
-  padding: 8px 10px;
+  padding: 7px 6px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tracker-entry-row:last-child td {
@@ -1793,8 +1803,29 @@ tr:hover .delete-btn,
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
   font-size: 12px;
-  white-space: nowrap;
 }
+
+.tracker-editable { cursor: text; }
+.tracker-editable:hover { background: var(--surface); }
+
+.tracker-inline-input {
+  width: 100%;
+  border: 1px solid #6366f1;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 4px;
+  text-align: right;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+}
+
+/* Hide number input spinners */
+.tracker-inline-input::-webkit-inner-spin-button,
+.tracker-inline-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.tracker-inline-input[type=number] { -moz-appearance: textfield; }
 
 .tracker-username {
   font-weight: 600;
