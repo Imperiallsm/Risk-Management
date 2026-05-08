@@ -10,9 +10,41 @@
 <body>
 
 <!-- ══════════════════════════════════════
+     PORTAL SCREEN
+══════════════════════════════════════ -->
+<div id="portal-screen">
+  <div class="portal-center">
+    <div class="auth-logo-block">
+      <img src="brand_assets/risklogo.png" alt="Risk Universalis" class="auth-logo-img" onerror="this.style.display='none'" />
+      <h1 class="auth-brand-name">Risk Universalis</h1>
+      <p class="auth-brand-sub">Workspace Platform</p>
+    </div>
+    <div class="portal-card">
+      <p class="portal-question">Where will you be signing in?</p>
+      <div class="portal-options">
+        <button class="portal-option" id="portal-directory">
+          <div class="portal-option-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <span class="portal-option-name">Directory</span>
+          <span class="portal-option-desc">Staff management, projects &amp; meetings</span>
+        </button>
+        <button class="portal-option" id="portal-stats">
+          <div class="portal-option-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <span class="portal-option-name">Master Statistics</span>
+          <span class="portal-option-desc">Analytics &amp; performance data</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
      AUTH SCREEN
 ══════════════════════════════════════ -->
-<div id="auth-screen">
+<div id="auth-screen" class="hidden">
   <div class="auth-center">
     <div class="auth-logo-block">
       <img src="brand_assets/risklogo.png" alt="Risk Universalis" class="auth-logo-img" onerror="this.style.display='none'" />
@@ -47,7 +79,7 @@
           <input class="otp-box" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" />
         </div>
         <p class="auth-hint">Enter the 8-digit code from your email</p>
-        <button class="btn-link" id="back-btn">← Use a different email</button>
+        <button class="btn-link" id="back-btn">← Choose a different portal</button>
       </div>
     </div>
   </div>
@@ -114,6 +146,9 @@
     <div id="view-wrap" class="view-wrap"></div>
   </main>
 </div>
+
+<!-- Stats App Shell -->
+<div id="stats-app" class="app-hidden"></div>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modal-overlay">

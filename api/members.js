@@ -38,10 +38,10 @@ module.exports = async (req, res) => {
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (req.method === 'POST') {
-    const { name, email, role } = req.body || {};
+    const { name, email, role, access } = req.body || {};
     if (!name || !email) return res.status(400).json({ error: 'name and email required' });
     const { data, error } = await sb.from('members')
-      .insert({ name, email, role: role || 'Member', join_date: new Date().toISOString().split('T')[0] })
+      .insert({ name, email, role: role || 'Member', access: access || 'directory', join_date: new Date().toISOString().split('T')[0] })
       .select().single();
     if (error) return res.status(500).json({ error: error.message });
 

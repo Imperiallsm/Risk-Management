@@ -4,7 +4,8 @@
 //  CONSTANTS
 // ══════════════════════════════════════════════════
 
-let pendingEmail = '';
+let pendingEmail  = '';
+let pendingPortal = '';
 
 const STATUS_CYCLE = ['To Do', 'In Progress', 'Review', 'Stuck', 'Done'];
 const INVOICE_STATUS_CYCLE = ['Pending', 'Paid', 'Overdue'];
@@ -279,20 +280,45 @@ function getStoredSession() {
   }
 }
 
-function initAuth() {
-  if (getStoredSession()) {
+function initPortal() {
+  const session = getStoredSession();
+  if (session) {
+    document.getElementById('portal-screen').style.display = 'none';
     enterApp();
     return;
   }
 
+  document.getElementById('portal-directory').addEventListener('click', () => selectPortal('directory'));
+  document.getElementById('portal-stats').addEventListener('click', () => selectPortal('stats'));
+}
+
+function selectPortal(portal) {
+  pendingPortal = portal;
+  document.getElementById('portal-screen').style.display = 'none';
+  const authScreen = document.getElementById('auth-screen');
+  authScreen.classList.remove('hidden');
+  initAuth();
+}
+
+function initAuth() {
   const continueBtn = document.getElementById('continue-btn');
   const emailInput  = document.getElementById('email-input');
   const backBtn     = document.getElementById('back-btn');
 
   continueBtn.addEventListener('click', checkEmail);
   emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') checkEmail(); });
-  backBtn.addEventListener('click', goBackToEmail);
+  backBtn.addEventListener('click', goBackToAuth);
   initOTP();
+}
+
+function goBackToAuth() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('portal-screen').style.display = '';
+  document.getElementById('step-code').classList.add('hidden');
+  document.getElementById('step-email').classList.remove('hidden');
+  document.querySelectorAll('.otp-box').forEach(b => b.value = '');
+  pendingEmail = '';
+  pendingPortal = '';
 }
 
 async function checkEmail() {
@@ -310,7 +336,7 @@ async function checkEmail() {
     const res = await fetch('/api/check-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: val }),
+      body: JSON.stringify({ email: val, portal: pendingPortal }),
     });
 
     if (!res.ok) {
@@ -409,7 +435,7 @@ async function checkOTPComplete(boxes) {
     }
 
     const { access_token, expires_at } = await res.json();
-    localStorage.setItem('ru_session', JSON.stringify({ access_token, expires_at, email: pendingEmail }));
+    localStorage.setItem('ru_session', JSON.stringify({ access_token, expires_at, email: pendingEmail, portal: pendingPortal }));
     enterApp();
   } catch {
     boxes.forEach(b => { b.disabled = false; });
@@ -419,11 +445,16 @@ async function checkOTPComplete(boxes) {
 
 function enterApp() {
   const authScreen = document.getElementById('auth-screen');
-  authScreen.classList.add('auth-exit');
-  setTimeout(() => {
-    authScreen.style.display = 'none';
-    initApp();
-  }, 280);
+  const portal = getStoredSession()?.portal || pendingPortal || 'directory';
+  if (!authScreen.classList.contains('hidden')) {
+    authScreen.classList.add('auth-exit');
+    setTimeout(() => {
+      authScreen.style.display = 'none';
+      portal === 'stats' ? initStatsApp() : initApp();
+    }, 280);
+  } else {
+    portal === 'stats' ? initStatsApp() : initApp();
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -464,6 +495,31 @@ async function initApp() {
   renderSidebarFooter();
   navigate('overview', true);
   bindAppEvents();
+}
+
+async function initStatsApp() {
+  applyTheme(state.theme);
+  const wrap = document.getElementById('stats-app');
+  const session = getStoredSession();
+  const email = session?.email || '';
+  wrap.innerHTML = `
+    <div class="stats-portal-wrap">
+      <div class="stats-portal-header">
+        <img src="brand_assets/risklogo.png" alt="Risk Universalis" style="height:32px;width:auto;" onerror="this.style.display='none'" />
+        <div>
+          <h1 style="font-size:20px;font-weight:600;color:var(--text)">Master Statistics</h1>
+          <p style="font-size:12px;color:var(--text-3)">Risk Universalis</p>
+        </div>
+        <button class="btn-ghost" onclick="signOut()" style="margin-left:auto">Sign Out</button>
+      </div>
+      <div class="stats-portal-body">
+        <p style="color:var(--text-2);font-size:14px">Signed in as <strong>${email}</strong></p>
+        <p style="color:var(--text-3);font-size:13px;margin-top:8px">Master Statistics is coming soon.</p>
+      </div>
+    </div>
+  `;
+  wrap.classList.remove('app-hidden');
+  wrap.classList.add('app-visible');
 }
 
 function bindAppEvents() {
@@ -2109,6 +2165,14 @@ function openInviteModal() {
           <option value="Admin">Admin</option>
         </select>
       </div>
+      <div class="form-row">
+        <label class="form-label">Portal Access</label>
+        <select class="form-select" id="inv-access">
+          <option value="directory">Directory only</option>
+          <option value="stats">Master Statistics only</option>
+          <option value="both">Directory &amp; Master Statistics</option>
+        </select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
@@ -2118,9 +2182,10 @@ function openInviteModal() {
 }
 
 async function confirmInvite() {
-  const name  = document.getElementById('inv-name')?.value.trim();
-  const email = document.getElementById('inv-email')?.value.trim();
-  const role  = document.getElementById('inv-role')?.value;
+  const name   = document.getElementById('inv-name')?.value.trim();
+  const email  = document.getElementById('inv-email')?.value.trim();
+  const role   = document.getElementById('inv-role')?.value;
+  const access = document.getElementById('inv-access')?.value || 'directory';
 
   if (!name || !email) {
     if (!name)  document.getElementById('inv-name').style.borderColor  = 'var(--urgent)';
@@ -2129,7 +2194,7 @@ async function confirmInvite() {
   }
 
   try {
-    const member = await api('/api/members', 'POST', { name, email, role });
+    const member = await api('/api/members', 'POST', { name, email, role, access });
     state.members.push(member);
   } catch (e) { console.error(e); return; }
 
@@ -2981,5 +3046,5 @@ async function confirmTrackerNotes(entryId, monthId) {
 
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme(state.theme);
-  initAuth();
+  initPortal();
 });

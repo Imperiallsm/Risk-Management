@@ -16,20 +16,28 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email } = req.body || {};
+  const { email, portal } = req.body || {};
   if (!email || typeof email !== 'string') {
     return res.status(400).json({ error: 'Email required' });
   }
 
   const normalized = email.trim().toLowerCase();
+  const requestedPortal = portal === 'stats' ? 'stats' : 'directory';
 
-  // Hardcoded always-allowed emails
   if (!ALWAYS_ALLOWED.has(normalized)) {
-    // Everyone else must be in the members table (invited by admin)
     const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-    const { data } = await sb.from('members').select('id').eq('email', normalized).maybeSingle();
+    const { data } = await sb.from('members').select('id, access').eq('email', normalized).maybeSingle();
     if (!data) {
       return res.status(403).json({ error: 'Email not authorized' });
+    }
+    const memberAccess = data.access || 'directory';
+    const allowed = memberAccess === 'both' || memberAccess === requestedPortal;
+    if (!allowed) {
+      return res.status(403).json({
+        error: requestedPortal === 'stats'
+          ? 'You do not have access to Master Statistics.'
+          : 'You do not have access to Directory.',
+      });
     }
   }
 

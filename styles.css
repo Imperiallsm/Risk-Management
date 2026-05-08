@@ -106,6 +106,94 @@ body {
 .hidden { display: none !important; }
 
 /* ══════════════════════════════════════════════════
+   PORTAL SCREEN
+══════════════════════════════════════════════════ */
+#portal-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 24px;
+}
+
+.portal-center {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.portal-card {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  box-shadow: var(--shadow);
+}
+
+.portal-question {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.portal-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.portal-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--trans), background var(--trans), box-shadow var(--trans);
+  text-align: center;
+}
+
+.portal-option:hover {
+  border-color: var(--text-3);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.portal-option-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+
+.portal-option-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.portal-option-desc {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+/* ══════════════════════════════════════════════════
    AUTH SCREEN
 ══════════════════════════════════════════════════ */
 #auth-screen {
@@ -263,6 +351,27 @@ body {
 }
 
 #app.app-hidden { display: none; }
+#stats-app.app-hidden { display: none; }
+
+.stats-portal-wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.stats-portal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar-bg);
+}
+
+.stats-portal-body {
+  padding: 48px 28px;
+}
 
 .sidebar {
   position: fixed;
