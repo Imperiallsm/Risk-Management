@@ -58,6 +58,7 @@ module.exports = async (req, res) => {
     name: m.name,
     email: m.email,
     role: m.role,
+    access: m.access || 'directory',
     joinDate: m.join_date,
   }));
 

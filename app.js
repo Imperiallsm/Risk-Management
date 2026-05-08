@@ -497,11 +497,33 @@ async function initApp() {
   bindAppEvents();
 }
 
+const STATS_ADMIN_EMAILS = new Set([
+  'alverzalexander0@gmail.com',
+  'riskimperialist@gmail.com',
+  'saltbear1project.rt@gmail.com',
+]);
+
 async function initStatsApp() {
   applyTheme(state.theme);
   const wrap = document.getElementById('stats-app');
   const session = getStoredSession();
   const email = session?.email || '';
+  const isAdmin = STATS_ADMIN_EMAILS.has(email);
+
+  try {
+    const data = await api('/api/data');
+    state.members = data.members || [];
+  } catch (e) { console.error(e); }
+
+  renderStatsApp(isAdmin, email);
+  wrap.classList.remove('app-hidden');
+  wrap.classList.add('app-visible');
+}
+
+function renderStatsApp(isAdmin, email) {
+  const wrap = document.getElementById('stats-app');
+  const statsMembers = state.members.filter(m => m.access === 'stats' || m.access === 'both');
+
   wrap.innerHTML = `
     <div class="stats-portal-wrap">
       <div class="stats-portal-header">
@@ -510,16 +532,87 @@ async function initStatsApp() {
           <h1 style="font-size:20px;font-weight:600;color:var(--text)">Master Statistics</h1>
           <p style="font-size:12px;color:var(--text-3)">Risk Universalis</p>
         </div>
-        <button class="btn-ghost" onclick="signOut()" style="margin-left:auto">Sign Out</button>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          ${isAdmin ? `<button class="btn-primary" onclick="openStatsInviteModal()">+ Add User</button>` : ''}
+          <button class="btn-ghost" onclick="signOut()">Sign Out</button>
+        </div>
       </div>
       <div class="stats-portal-body">
-        <p style="color:var(--text-2);font-size:14px">Signed in as <strong>${email}</strong></p>
-        <p style="color:var(--text-3);font-size:13px;margin-top:8px">Master Statistics is coming soon.</p>
+        <p style="color:var(--text-2);font-size:13px;margin-bottom:24px">Signed in as <strong>${email}</strong></p>
+        ${isAdmin ? `
+          <div style="margin-bottom:32px">
+            <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Users with Master Statistics access</p>
+            ${statsMembers.length === 0
+              ? `<p style="font-size:13px;color:var(--text-3)">No users added yet.</p>`
+              : `<div class="stats-user-list">
+                  ${statsMembers.map(m => `
+                    <div class="stats-user-row">
+                      <div class="stats-user-info">
+                        <span class="stats-user-name">${m.name}</span>
+                        <span class="stats-user-email">${m.email}</span>
+                      </div>
+                      <span class="stats-access-badge ${m.access === 'both' ? 'badge-both' : 'badge-stats'}">${m.access === 'both' ? 'Dir + Stats' : 'Stats only'}</span>
+                      <button class="btn-ghost btn-sm" onclick="removeStatsMember('${m.id}','${m.name}')">Remove</button>
+                    </div>
+                  `).join('')}
+                </div>`
+            }
+          </div>
+        ` : ''}
+        <p style="color:var(--text-3);font-size:13px">Master Statistics content is coming soon.</p>
       </div>
     </div>
   `;
-  wrap.classList.remove('app-hidden');
-  wrap.classList.add('app-visible');
+}
+
+async function removeStatsMember(id, name) {
+  if (!confirm(`Remove ${name} from Master Statistics?`)) return;
+  try {
+    await api('/api/members', 'DELETE', { id });
+    state.members = state.members.filter(m => m.id !== id);
+    const session = getStoredSession();
+    renderStatsApp(STATS_ADMIN_EMAILS.has(session?.email || ''), session?.email || '');
+  } catch (e) { console.error(e); }
+}
+
+function openStatsInviteModal() {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Add Stats User</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Full Name</label>
+        <input type="text" class="form-input" id="si-name" placeholder="Jane Smith" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-input" id="si-email" placeholder="jane@company.com" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmStatsInvite()">Add User</button>
+    </div>
+  `);
+}
+
+async function confirmStatsInvite() {
+  const name  = document.getElementById('si-name')?.value.trim();
+  const email = document.getElementById('si-email')?.value.trim();
+  if (!name || !email) {
+    if (!name)  document.getElementById('si-name').style.borderColor  = 'var(--urgent)';
+    if (!email) document.getElementById('si-email').style.borderColor = 'var(--urgent)';
+    return;
+  }
+  try {
+    const member = await api('/api/members', 'POST', { name, email, role: 'Viewer', access: 'stats' });
+    state.members.push(member);
+    closeModal();
+    const session = getStoredSession();
+    renderStatsApp(STATS_ADMIN_EMAILS.has(session?.email || ''), session?.email || '');
+  } catch (e) { console.error(e); }
 }
 
 function bindAppEvents() {
