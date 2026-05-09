@@ -578,6 +578,8 @@ const statState = {
   userEmail: '',
   history: [],
   historyLoaded: false,
+  exportMode: false,
+  exportSelected: new Set(),
 };
 
 async function statApi(path, method, body) {
@@ -861,11 +863,19 @@ function renderStatsMain() {
       </div>
       ${activeMonth ? `
         <div class="stats-tracker-actions">
-          <button class="btn-ghost btn-sm" onclick="openDuplicateMonthModal('${activeMonth.id}','${activeMonth.name.replace(/'/g,"\\'")}')">Duplicate</button>
-          <button class="btn-ghost btn-sm" onclick="openAddStatColumnModal('${activeMonth.id}')">+ Column</button>
-          <button class="btn-ghost btn-sm" onclick="openValueSettingsModal('${activeMonth.id}')">Value Settings</button>
-          <button class="btn-primary btn-sm" onclick="openAddStatEntryModal('${activeMonth.id}')">+ Entry</button>
-          <button class="btn-ghost btn-sm" style="color:var(--urgent)" onclick="deleteStatMonth('${activeMonth.id}')">Delete</button>
+          ${statState.exportMode ? `
+            <button class="btn-ghost btn-sm" onclick="selectAllExport('${activeMonth.id}')">Select All</button>
+            <button class="btn-ghost btn-sm" onclick="deselectAllExport()">Deselect All</button>
+            <button class="btn-primary btn-sm" onclick="downloadExport('${activeMonth.id}')">Download CSV</button>
+            <button class="btn-ghost btn-sm" onclick="exitExportMode()">Cancel</button>
+          ` : `
+            <button class="btn-ghost btn-sm" onclick="openDuplicateMonthModal('${activeMonth.id}','${activeMonth.name.replace(/'/g,"\\'")}')">Duplicate</button>
+            <button class="btn-ghost btn-sm" onclick="openAddStatColumnModal('${activeMonth.id}')">+ Column</button>
+            <button class="btn-ghost btn-sm" onclick="openValueSettingsModal('${activeMonth.id}')">Value Settings</button>
+            <button class="btn-ghost btn-sm" onclick="enterExportMode()">Export</button>
+            <button class="btn-primary btn-sm" onclick="openAddStatEntryModal('${activeMonth.id}')">+ Entry</button>
+            <button class="btn-ghost btn-sm" style="color:var(--urgent)" onclick="deleteStatMonth('${activeMonth.id}')">Delete</button>
+          `}
         </div>
       ` : ''}
     </div>
@@ -955,14 +965,74 @@ async function refreshStatHistory() {
   renderStatsMain();
 }
 
+function enterExportMode() {
+  statState.exportMode = true;
+  statState.exportSelected = new Set();
+  renderStatsMain();
+}
+
+function exitExportMode() {
+  statState.exportMode = false;
+  statState.exportSelected = new Set();
+  renderStatsMain();
+}
+
+function toggleExportRow(entryId, checked) {
+  if (checked) statState.exportSelected.add(entryId);
+  else statState.exportSelected.delete(entryId);
+}
+
+function selectAllExport(monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  month.entries.forEach(e => statState.exportSelected.add(e.id));
+  renderStatsMain();
+}
+
+function deselectAllExport() {
+  statState.exportSelected = new Set();
+  renderStatsMain();
+}
+
+function downloadExport(monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  const cols = month.columns || [];
+  const entries = [...month.entries]
+    .filter(e => statState.exportSelected.has(e.id))
+    .sort((a, b) => a.username.localeCompare(b.username));
+  if (!entries.length) { alert('Select at least one entry to export.'); return; }
+
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = ['Username', 'Freedcamp Link', ...cols.map(c => c.name), 'Notes'];
+  const rows = entries.map(e => [
+    escape(e.username),
+    escape(e.values.__link__ || ''),
+    ...cols.map(c => escape(e.values[c.id] ?? '')),
+    escape(e.values.__notes__ || ''),
+  ]);
+
+  const csv = [headers.map(escape), ...rows].map(r => r.join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${month.name.replace(/[^a-z0-9]/gi,'_')}_export.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  exitExportMode();
+}
+
 function renderStatsTrackerTable(month) {
   const cols = month.columns || [];
-  const entries = month.entries || [];
+  const entries = [...(month.entries || [])].sort((a, b) => a.username.localeCompare(b.username));
+  const exporting = statState.exportMode;
   return `
     <div class="tracker-table-wrap" style="margin-top:0">
       <table class="tracker-table stat-col-dividers">
         <thead>
           <tr>
+            ${exporting ? `<th style="width:32px"></th>` : ''}
             <th style="text-align:left;min-width:130px">Username</th>
             ${cols.map(c => `
               <th class="stat-col-header">
@@ -975,7 +1045,7 @@ function renderStatsTrackerTable(month) {
         </thead>
         <tbody>
           ${entries.length === 0
-            ? `<tr><td colspan="${cols.length + 2}" style="text-align:center;padding:24px;color:var(--text-3)">No entries — click "+ Entry" to add one.</td></tr>`
+            ? `<tr><td colspan="${cols.length + (exporting ? 3 : 2)}" style="text-align:center;padding:24px;color:var(--text-3)">No entries — click "+ Entry" to add one.</td></tr>`
             : entries.map(e => renderStatEntry(e, month, cols)).join('')
           }
         </tbody>
@@ -1092,8 +1162,10 @@ function renderStatEntry(entry, month, cols) {
   const statusCol = cols.find(c => c.type === 'status');
   const statusVal = statusCol ? (entry.values[statusCol.id] || '') : '';
   const rowCls = STATUS_ROW_CLASS[statusVal] || '';
+  const checked = statState.exportSelected.has(entry.id);
   return `
     <tr class="${rowCls}" title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
+      ${statState.exportMode ? `<td style="text-align:center;width:32px"><input type="checkbox" class="export-checkbox" data-entry-id="${entry.id}" ${checked ? 'checked' : ''} onchange="toggleExportRow('${entry.id}',this.checked)" /></td>` : ''}
       <td>
         ${link ? `<a href="${link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" class="stat-entry-link">${entry.username}</a>` : entry.username}
       </td>
