@@ -569,31 +569,35 @@ td:has(.stat-dropdown-cell) { text-align: center; }
 }
 .stat-dropdown-cell:hover { background: var(--surface); }
 
-/* Prev Rank colours */
-.rank-participant  { color: #16a34a; background: #dcfce7; }
-.rank-experienced  { color: #22c55e; background: #f0fdf4; }
-.rank-trusted      { color: #15803d; background: #bbf7d0; }
-.rank-trial-mod    { color: #a16207; background: #fef9c3; }
-.rank-moderator    { color: #c2410c; background: #ffedd5; }
+/* Prev Rank colours — light mode */
+.rank-participant  { color: #16a34a; background: rgba(22,163,74,0.12); }
+.rank-experienced  { color: #4ade80; background: rgba(74,222,128,0.12); }
+.rank-trusted      { color: #15803d; background: rgba(21,128,61,0.18); }
+.rank-trial-mod    { color: #ca8a04; background: rgba(202,138,4,0.12); }
+.rank-moderator    { color: #ea580c; background: rgba(234,88,12,0.12); }
 
 /* Status cell colours */
 .status-trial    { color: var(--text-2); }
-.status-promoted { color: #16a34a; }
-.status-demoted  { color: #dc2626; }
+.status-promoted { color: #4ade80; }
+.status-demoted  { color: #f87171; }
 .status-resigned { color: var(--text-3); }
-.status-extended { color: #0369a1; }
+.status-extended { color: #60a5fa; }
 
-/* Status row styles */
-.stat-row-demoted td  { background: #fff1f2 !important; color: #dc2626; text-decoration: line-through; }
-.stat-row-promoted td { background: #f0fdf4 !important; }
-.stat-row-resigned td { text-decoration: line-through; }
-.stat-row-extended td { background: #eff6ff !important; text-decoration: line-through; }
+/* Status row styles — use rgba so they layer on dark bg */
+.stat-row-demoted td  { background: rgba(239,68,68,0.08) !important; color: #f87171; text-decoration: line-through; }
+.stat-row-promoted td { background: rgba(74,222,128,0.08) !important; }
+.stat-row-resigned td { text-decoration: line-through; color: var(--text-3); }
+.stat-row-extended td { background: rgba(96,165,250,0.08) !important; text-decoration: line-through; color: var(--text-2); }
 
-/* Keep dropdown/action cells readable regardless of row class */
+/* Keep dropdown/button cells legible regardless of row class */
 .stat-row-demoted  .stat-dropdown-cell,
 .stat-row-promoted .stat-dropdown-cell,
 .stat-row-resigned .stat-dropdown-cell,
 .stat-row-extended .stat-dropdown-cell { text-decoration: none; }
+.stat-row-demoted  td:last-child,
+.stat-row-promoted td:last-child,
+.stat-row-resigned td:last-child,
+.stat-row-extended td:last-child { text-decoration: none; color: var(--text-2); }
 
 /* History */
 .stat-history-list {
