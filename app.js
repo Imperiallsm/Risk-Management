@@ -1094,8 +1094,8 @@ function renderStatEntry(entry, month, cols) {
   const rowCls = STATUS_ROW_CLASS[statusVal] || '';
   return `
     <tr class="${rowCls}" title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
-      <td class="tracker-editable" data-stat-action="inline-username" data-entry-id="${entry.id}" data-month-id="${month.id}">
-        ${link ? `<a href="${link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" class="stat-entry-link" onclick="event.stopPropagation()">${entry.username}</a>` : entry.username}
+      <td>
+        ${link ? `<a href="${link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" class="stat-entry-link">${entry.username}</a>` : entry.username}
       </td>
       ${cols.map(c => {
         if (DROPDOWN_OPTION_MAP[c.type]) return renderStatDropdownCell(c, entry, month);
