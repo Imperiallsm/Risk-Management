@@ -754,16 +754,7 @@ function handleStatsClick(e) {
       break;
     }
     case 'delete-col': {
-      const colId   = el.dataset.colId;
-      const monthId = el.dataset.monthId;
-      const month = statState.months.find(m => m.id === monthId);
-      if (!month) return;
-      const col = month.columns.find(c => c.id === colId);
-      month.columns = month.columns.filter(c => c.id !== colId);
-      month.entries.forEach(e => { delete e.values[colId]; });
-      renderStatsMain();
-      statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
-      logStatHistory('deleted', 'column', col?.name || '', month.name, statState.activeSection);
+      openDeleteStatColumnModal(el.dataset.colId, el.dataset.monthId);
       break;
     }
     case 'edit-entry': {
@@ -1121,6 +1112,38 @@ async function confirmRenameStatColumn(colId, monthId) {
   renderStatsMain();
   statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
   logStatHistory('edited', 'column', name, month.name, statState.activeSection, oldCol ? `Renamed from "${oldCol.name}"` : '');
+}
+
+function openDeleteStatColumnModal(colId, monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  const col = month?.columns.find(c => c.id === colId);
+  if (!col) return;
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Delete Column</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0;color:var(--text-1)">Are you sure you want to delete the column <strong>"${col.name}"</strong>?</p>
+      <p style="margin:8px 0 0;color:var(--text-3);font-size:13px">All data in this column will be permanently removed.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-danger" onclick="confirmDeleteStatColumn('${colId}','${monthId}')">Delete</button>
+    </div>
+  `);
+}
+
+async function confirmDeleteStatColumn(colId, monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  const col = month.columns.find(c => c.id === colId);
+  month.columns = month.columns.filter(c => c.id !== colId);
+  month.entries.forEach(e => { delete e.values[colId]; });
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
+  logStatHistory('deleted', 'column', col?.name || '', month.name, statState.activeSection);
 }
 
 function statSelectMonth(monthId) {

@@ -554,16 +554,18 @@ body {
 .stat-col-name:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* Stat tracker dropdown cells */
+td:has(.stat-dropdown-cell) { text-align: center; }
 .stat-dropdown-cell {
   border: none;
   background: transparent;
   font-size: 12px;
   font-weight: 600;
-  padding: 2px 4px;
+  padding: 2px 6px;
   border-radius: 4px;
   cursor: pointer;
   outline: none;
-  min-width: 110px;
+  width: 100%;
+  text-align: center;
 }
 .stat-dropdown-cell:hover { background: var(--surface); }
 
