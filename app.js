@@ -503,6 +503,19 @@ const STATS_ADMIN_EMAILS = new Set([
   'saltbear1project.rt@gmail.com',
 ]);
 
+// ── Stats History ─────────────────────────────────
+
+function logStatHistory(action, entityType, entityLabel, monthName, section, detail) {
+  const email  = statState.userEmail;
+  const member = state.members.find(m => m.email === email);
+  const name   = member?.name || email.split('@')[0];
+  statApi('/api/stat-tracker-history', 'POST', {
+    actorEmail: email, actorName: name, action, entityType,
+    entityLabel: entityLabel || '', monthName: monthName || '',
+    section: section || '', detail: detail || '',
+  }).catch(console.error);
+}
+
 // ── Stats App State ───────────────────────────────
 
 const STAT_SECTIONS = [
@@ -520,6 +533,8 @@ const statState = {
   activeMonth: null,
   isAdmin: false,
   userEmail: '',
+  history: [],
+  historyLoaded: false,
 };
 
 async function statApi(path, method, body) {
@@ -601,8 +616,12 @@ function renderStatsSidebar() {
             `).join('')}
           </div>
         ` : ''}
+        <button class="stats-nav-item ${activeView === 'history' ? 'active' : ''}" onclick="statNavigate('history')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          History
+        </button>
         ${isAdmin ? `
-          <button class="stats-nav-item" onclick="statNavigate('users')">
+          <button class="stats-nav-item ${activeView === 'users' ? 'active' : ''}" onclick="statNavigate('users')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             Users
           </button>
@@ -704,9 +723,11 @@ function handleStatsClick(e) {
       const monthId = el.dataset.monthId;
       const month = statState.months.find(m => m.id === monthId);
       if (!month) return;
+      const entry = month.entries.find(e => e.id === entryId);
       month.entries = month.entries.filter(e => e.id !== entryId);
       renderStatsMain();
       statApi('/api/stat-tracker-entries', 'DELETE', { id: entryId });
+      logStatHistory('deleted', 'entry', entry?.username || '', month.name, statState.activeSection);
       break;
     }
     case 'delete-col': {
@@ -714,10 +735,12 @@ function handleStatsClick(e) {
       const monthId = el.dataset.monthId;
       const month = statState.months.find(m => m.id === monthId);
       if (!month) return;
+      const col = month.columns.find(c => c.id === colId);
       month.columns = month.columns.filter(c => c.id !== colId);
       month.entries.forEach(e => { delete e.values[colId]; });
       renderStatsMain();
       statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
+      logStatHistory('deleted', 'column', col?.name || '', month.name, statState.activeSection);
       break;
     }
     case 'edit-entry': {
@@ -778,6 +801,11 @@ function renderStatsMain() {
     return;
   }
 
+  if (statState.activeView === 'history') {
+    renderStatsHistoryView(el);
+    return;
+  }
+
   const section = STAT_SECTIONS.find(s => s.id === statState.activeSection);
   const sectionMonths = statState.months.filter(m => m.section === statState.activeSection);
   const activeMonth = sectionMonths.find(m => m.id === statState.activeMonth) || sectionMonths[0] || null;
@@ -830,6 +858,63 @@ function renderStatsUsersView(el) {
         </div>`
     }
   `;
+}
+
+async function renderStatsHistoryView(el) {
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:600;color:var(--text)">History</h2>
+      <button class="btn-ghost btn-sm" onclick="refreshStatHistory()">Refresh</button>
+    </div>
+    <p style="color:var(--text-3);font-size:13px">Loading…</p>
+  `;
+  if (!statState.historyLoaded) {
+    try {
+      statState.history = await statApi('/api/stat-tracker-history', 'GET');
+      statState.historyLoaded = true;
+    } catch (e) { console.error(e); }
+  }
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:600;color:var(--text)">History</h2>
+      <button class="btn-ghost btn-sm" onclick="refreshStatHistory()">Refresh</button>
+    </div>
+    ${statState.history.length === 0
+      ? `<p style="color:var(--text-3);font-size:13px">No history yet.</p>`
+      : `<div class="stat-history-list">
+          ${statState.history.map(h => {
+            const when = new Date(h.created_at);
+            const timeStr = when.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              + ' · ' + when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const actionColor = h.action === 'deleted' ? 'var(--urgent)' : h.action === 'edited' ? '#2563eb' : 'var(--safe)';
+            const sectionLabel = h.section ? h.section.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+            return `
+              <div class="stat-history-row">
+                <div class="stat-history-left">
+                  <span class="stat-history-badge" style="background:${actionColor}20;color:${actionColor}">${h.action}</span>
+                  <div>
+                    <p class="stat-history-main">
+                      <strong>${h.actor_name || h.actor_email}</strong>
+                      ${h.action} <em>${h.entity_type}</em>
+                      ${h.entity_label ? `<strong>"${h.entity_label}"</strong>` : ''}
+                      ${h.month_name ? `in <strong>${h.month_name}</strong>` : ''}
+                      ${sectionLabel ? `<span style="color:var(--text-3)">(${sectionLabel})</span>` : ''}
+                    </p>
+                    ${h.detail ? `<p class="stat-history-detail">${h.detail}</p>` : ''}
+                  </div>
+                </div>
+                <span class="stat-history-time">${timeStr}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>`
+    }
+  `;
+}
+
+async function refreshStatHistory() {
+  statState.historyLoaded = false;
+  renderStatsMain();
 }
 
 function renderStatsTrackerTable(month) {
@@ -929,12 +1014,15 @@ async function confirmEditStatEntry(entryId, monthId) {
     const el = document.getElementById(`se-col-${c.id}`);
     if (el) newValues[c.id] = c.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
   });
+  const prevUsername = entry.username;
   entry.username = username;
   entry.values   = newValues;
   month.entries = [...month.entries].sort((a, b) => a.username.localeCompare(b.username));
   closeModal();
   renderStatsMain();
   statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, username, values: newValues });
+  const detail = username !== prevUsername ? `Username changed from "${prevUsername}" to "${username}"` : '';
+  logStatHistory('edited', 'entry', username, month.name, statState.activeSection, detail);
 }
 
 function openRenameStatColumnModal(colId, monthId, currentName) {
@@ -962,10 +1050,12 @@ async function confirmRenameStatColumn(colId, monthId) {
   if (!name) return;
   const month = statState.months.find(m => m.id === monthId);
   if (!month) return;
+  const oldCol = month.columns.find(c => c.id === colId);
   month.columns = month.columns.map(c => c.id === colId ? { ...c, name } : c);
   closeModal();
   renderStatsMain();
   statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
+  logStatHistory('edited', 'column', name, month.name, statState.activeSection, oldCol ? `Renamed from "${oldCol.name}"` : '');
 }
 
 function statSelectMonth(monthId) {
@@ -1002,6 +1092,7 @@ async function confirmAddStatMonth() {
     statState.activeMonth = month.id;
     closeModal();
     renderStatsMain();
+    logStatHistory('created', 'month', name, name, statState.activeSection);
   } catch (e) { console.error(e); }
 }
 
@@ -1029,23 +1120,27 @@ function openDuplicateMonthModal(sourceId, sourceName) {
 async function confirmDuplicateMonth(sourceId) {
   const name = document.getElementById('dup-month-name')?.value.trim();
   if (!name) { document.getElementById('dup-month-name').style.borderColor = 'var(--urgent)'; return; }
+  const srcMonth = statState.months.find(m => m.id === sourceId);
   try {
     const month = await statApi('/api/stat-tracker-months', 'POST', { section: statState.activeSection, name, duplicateFrom: sourceId });
     statState.months.push(month);
     statState.activeMonth = month.id;
     closeModal();
     renderStatsMain();
+    logStatHistory('created', 'month', name, name, statState.activeSection, `Duplicated from "${srcMonth?.name || sourceId}"`);
   } catch (e) { console.error(e); }
 }
 
 async function deleteStatMonth(monthId) {
   if (!confirm('Delete this month and all its entries?')) return;
+  const month = statState.months.find(m => m.id === monthId);
   try {
     await statApi('/api/stat-tracker-months', 'DELETE', { id: monthId });
     statState.months = statState.months.filter(m => m.id !== monthId);
     const remaining = statState.months.filter(m => m.section === statState.activeSection);
     statState.activeMonth = remaining[0]?.id || null;
     renderStatsMain();
+    logStatHistory('deleted', 'month', month?.name || monthId, month?.name || '', statState.activeSection);
   } catch (e) { console.error(e); }
 }
 
@@ -1087,6 +1182,7 @@ async function confirmAddStatColumn(monthId) {
   closeModal();
   renderStatsMain();
   statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
+  logStatHistory('created', 'column', name, month.name, statState.activeSection, `Type: ${type}`);
 }
 
 function openAddStatEntryModal(monthId) {
@@ -1118,6 +1214,7 @@ async function confirmAddStatEntry(monthId) {
     if (month) month.entries = [...month.entries, entry].sort((a, b) => a.username.localeCompare(b.username));
     closeModal();
     renderStatsMain();
+    logStatHistory('created', 'entry', username, month?.name || '', statState.activeSection);
   } catch (e) { console.error(e); }
 }
 

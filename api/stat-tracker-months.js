@@ -10,13 +10,26 @@ module.exports = async (req, res) => {
 
     let columns = [];
     if (duplicateFrom) {
-      const { data: src } = await sb.from('stat_tracker_months').select('columns,section').eq('id', duplicateFrom).single();
+      const [{ data: src }, { data: srcEntries }] = await Promise.all([
+        sb.from('stat_tracker_months').select('columns,section').eq('id', duplicateFrom).single(),
+        sb.from('stat_tracker_entries').select('username').eq('month_id', duplicateFrom),
+      ]);
       columns = src?.columns || [];
       const usedSection = section || src?.section;
       const { data, error } = await sb.from('stat_tracker_months')
         .insert({ section: usedSection, name, columns }).select().single();
       if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ id: data.id, section: data.section, name: data.name, columns: data.columns || [], entries: [] });
+
+      let entries = [];
+      if (srcEntries?.length) {
+        const { data: newEntries } = await sb.from('stat_tracker_entries')
+          .insert(srcEntries.map(e => ({ month_id: data.id, username: e.username, values: {} })))
+          .select();
+        entries = (newEntries || [])
+          .map(e => ({ id: e.id, monthId: e.month_id, username: e.username, values: {} }))
+          .sort((a, b) => a.username.localeCompare(b.username));
+      }
+      return res.status(200).json({ id: data.id, section: data.section, name: data.name, columns: data.columns || [], entries });
     }
 
     if (!section) return res.status(400).json({ error: 'section required' });

@@ -553,6 +553,44 @@ body {
 }
 .stat-col-name:hover { text-decoration: underline; text-underline-offset: 2px; }
 
+/* History */
+.stat-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.stat-history-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.stat-history-row:last-child { border-bottom: none; }
+
+.stat-history-left { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+
+.stat-history-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.stat-history-main { font-size: 13px; color: var(--text); line-height: 1.5; }
+.stat-history-main em { font-style: normal; color: var(--text-3); }
+.stat-history-detail { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.stat-history-time { font-size: 11px; color: var(--text-3); white-space: nowrap; margin-top: 3px; }
+
 .sidebar {
   position: fixed;
   left: 0; top: 0; bottom: 0;
