@@ -553,6 +553,46 @@ body {
 }
 .stat-col-name:hover { text-decoration: underline; text-underline-offset: 2px; }
 
+/* Stat tracker dropdown cells */
+.stat-dropdown-cell {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  min-width: 110px;
+}
+.stat-dropdown-cell:hover { background: var(--surface); }
+
+/* Prev Rank colours */
+.rank-participant  { color: #16a34a; background: #dcfce7; }
+.rank-experienced  { color: #22c55e; background: #f0fdf4; }
+.rank-trusted      { color: #15803d; background: #bbf7d0; }
+.rank-trial-mod    { color: #a16207; background: #fef9c3; }
+.rank-moderator    { color: #c2410c; background: #ffedd5; }
+
+/* Status cell colours */
+.status-trial    { color: var(--text-2); }
+.status-promoted { color: #16a34a; }
+.status-demoted  { color: #dc2626; }
+.status-resigned { color: var(--text-3); }
+.status-extended { color: #0369a1; }
+
+/* Status row styles */
+.stat-row-demoted td  { background: #fff1f2 !important; color: #dc2626; text-decoration: line-through; }
+.stat-row-promoted td { background: #f0fdf4 !important; }
+.stat-row-resigned td { text-decoration: line-through; }
+.stat-row-extended td { background: #eff6ff !important; text-decoration: line-through; }
+
+/* Keep dropdown/action cells readable regardless of row class */
+.stat-row-demoted  .stat-dropdown-cell,
+.stat-row-promoted .stat-dropdown-cell,
+.stat-row-resigned .stat-dropdown-cell,
+.stat-row-extended .stat-dropdown-cell { text-decoration: none; }
+
 /* History */
 .stat-history-list {
   display: flex;

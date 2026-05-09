@@ -497,6 +497,29 @@ async function initApp() {
   bindAppEvents();
 }
 
+const PREV_RANK_OPTIONS = [
+  { value: 'Participant',             label: 'Participant',             cls: 'rank-participant' },
+  { value: 'Experienced Participant', label: 'Experienced Participant', cls: 'rank-experienced' },
+  { value: 'Trusted Participant',     label: 'Trusted Participant',     cls: 'rank-trusted' },
+  { value: 'Trial Moderator',         label: 'Trial Moderator',         cls: 'rank-trial-mod' },
+  { value: 'Moderator',               label: 'Moderator',               cls: 'rank-moderator' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'Trial',    label: 'Trial',    cls: 'status-trial' },
+  { value: 'Promoted', label: 'Promoted', cls: 'status-promoted' },
+  { value: 'Demoted',  label: 'Demoted',  cls: 'status-demoted' },
+  { value: 'Resigned', label: 'Resigned', cls: 'status-resigned' },
+  { value: 'Extended', label: 'Extended', cls: 'status-extended' },
+];
+
+const STATUS_ROW_CLASS = {
+  Demoted:  'stat-row-demoted',
+  Promoted: 'stat-row-promoted',
+  Resigned: 'stat-row-resigned',
+  Extended: 'stat-row-extended',
+};
+
 const STATS_ADMIN_EMAILS = new Set([
   'alverzalexander0@gmail.com',
   'riskimperialist@gmail.com',
@@ -946,19 +969,38 @@ function renderStatsTrackerTable(month) {
   `;
 }
 
+function renderStatDropdownCell(c, entry, month) {
+  const val = entry.values[c.id] || '';
+  const options = c.type === 'prev-rank' ? PREV_RANK_OPTIONS : STATUS_OPTIONS;
+  const selected = options.find(o => o.value === val);
+  const cls = selected ? selected.cls : '';
+  return `<td>
+    <select class="stat-dropdown-cell ${cls}"
+            onchange="onStatDropdownChange(this,'${entry.id}','${c.id}','${month.id}')">${
+      '<option value="">—</option>' +
+      options.map(o => `<option value="${o.value}" ${val === o.value ? 'selected' : ''}>${o.label}</option>`).join('')
+    }</select>
+  </td>`;
+}
+
 function renderStatEntry(entry, month, cols) {
   const notes = entry.values.__notes__ || '';
+  const statusCol = cols.find(c => c.type === 'status');
+  const statusVal = statusCol ? (entry.values[statusCol.id] || '') : '';
+  const rowCls = STATUS_ROW_CLASS[statusVal] || '';
   return `
-    <tr title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
+    <tr class="${rowCls}" title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
       <td class="tracker-editable" data-stat-action="inline-username" data-entry-id="${entry.id}" data-month-id="${month.id}">${entry.username}</td>
-      ${cols.map(c => `
-        <td class="tracker-num tracker-editable"
+      ${cols.map(c => {
+        if (c.type === 'prev-rank' || c.type === 'status') return renderStatDropdownCell(c, entry, month);
+        const val = entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '');
+        return `<td class="tracker-num tracker-editable"
             data-stat-action="inline-value"
             data-entry-id="${entry.id}"
             data-col-id="${c.id}"
             data-col-type="${c.type}"
-            data-month-id="${month.id}">${entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '')}</td>
-      `).join('')}
+            data-month-id="${month.id}">${val}</td>`;
+      }).join('')}
       <td style="text-align:right;white-space:nowrap">
         ${notes ? `<span style="color:var(--text-3);font-size:11px;margin-right:2px" title="${notes.replace(/"/g,'&quot;')}">📝</span>` : ''}
         <button class="icon-btn" data-stat-action="edit-entry" data-entry-id="${entry.id}" data-month-id="${month.id}" title="Edit">${PENCIL_ICON}</button>
@@ -966,6 +1008,29 @@ function renderStatEntry(entry, month, cols) {
       </td>
     </tr>
   `;
+}
+
+async function onStatDropdownChange(select, entryId, colId, monthId) {
+  const val = select.value;
+  const month = statState.months.find(m => m.id === monthId);
+  const col = (month?.columns || []).find(c => c.id === colId);
+  const optionList = col?.type === 'prev-rank' ? PREV_RANK_OPTIONS : STATUS_OPTIONS;
+  const selected = optionList.find(o => o.value === val);
+
+  select.className = 'stat-dropdown-cell ' + (selected ? selected.cls : '');
+
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (entry) {
+    entry.values = { ...entry.values, [colId]: val };
+    const row = select.closest('tr');
+    if (row) {
+      const statusCol = (month.columns || []).find(c => c.type === 'status');
+      if (statusCol && colId === statusCol.id) {
+        row.className = STATUS_ROW_CLASS[val] || '';
+      }
+    }
+  }
+  statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, values: entry?.values });
 }
 
 function openEditStatEntryModal(entryId, monthId) {
@@ -1160,6 +1225,8 @@ function openAddStatColumnModal(monthId) {
         <select class="form-select" id="stat-col-type">
           <option value="number">Number</option>
           <option value="text">Text</option>
+          <option value="prev-rank">Prev Rank (dropdown)</option>
+          <option value="status">Status (dropdown)</option>
         </select>
       </div>
     </div>
