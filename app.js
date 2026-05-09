@@ -513,6 +513,26 @@ const STATUS_OPTIONS = [
   { value: 'Extended', label: 'Extended', cls: 'status-extended' },
 ];
 
+const HALFWAY_OPTIONS = [
+  { value: 'Completed', label: 'Completed', cls: 'halfway-completed' },
+  { value: 'Failed',    label: 'Failed',    cls: 'halfway-failed' },
+];
+
+const OBSERVATIONS_OPTIONS = [
+  { value: 'Very Positive', label: 'Very Positive', cls: 'obs-very-positive' },
+  { value: 'Positive',      label: 'Positive',      cls: 'obs-positive' },
+  { value: 'Neutral',       label: 'Neutral',       cls: 'obs-neutral' },
+  { value: 'Negative',      label: 'Negative',      cls: 'obs-negative' },
+  { value: 'Very Negative', label: 'Very Negative', cls: 'obs-very-negative' },
+];
+
+const DROPDOWN_OPTION_MAP = {
+  'prev-rank':    PREV_RANK_OPTIONS,
+  'status':       STATUS_OPTIONS,
+  'halfway':      HALFWAY_OPTIONS,
+  'observations': OBSERVATIONS_OPTIONS,
+};
+
 const STATUS_ROW_CLASS = {
   Demoted:  'stat-row-demoted',
   Promoted: 'stat-row-promoted',
@@ -962,7 +982,7 @@ function renderStatsTrackerTable(month) {
 
 function renderStatDropdownCell(c, entry, month) {
   const val = entry.values[c.id] || '';
-  const options = c.type === 'prev-rank' ? PREV_RANK_OPTIONS : STATUS_OPTIONS;
+  const options = DROPDOWN_OPTION_MAP[c.type] || STATUS_OPTIONS;
   const selected = options.find(o => o.value === val);
   const cls = selected ? selected.cls : '';
   return `<td>
@@ -983,7 +1003,7 @@ function renderStatEntry(entry, month, cols) {
     <tr class="${rowCls}" title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
       <td class="tracker-editable" data-stat-action="inline-username" data-entry-id="${entry.id}" data-month-id="${month.id}">${entry.username}</td>
       ${cols.map(c => {
-        if (c.type === 'prev-rank' || c.type === 'status') return renderStatDropdownCell(c, entry, month);
+        if (DROPDOWN_OPTION_MAP[c.type]) return renderStatDropdownCell(c, entry, month);
         const val = entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '');
         return `<td class="tracker-num tracker-editable"
             data-stat-action="inline-value"
@@ -1005,7 +1025,7 @@ async function onStatDropdownChange(select, entryId, colId, monthId) {
   const val = select.value;
   const month = statState.months.find(m => m.id === monthId);
   const col = (month?.columns || []).find(c => c.id === colId);
-  const optionList = col?.type === 'prev-rank' ? PREV_RANK_OPTIONS : STATUS_OPTIONS;
+  const optionList = DROPDOWN_OPTION_MAP[col?.type] || STATUS_OPTIONS;
   const selected = optionList.find(o => o.value === val);
 
   select.className = 'stat-dropdown-cell ' + (selected ? selected.cls : '');
@@ -1250,6 +1270,8 @@ function openAddStatColumnModal(monthId) {
           <option value="text">Text</option>
           <option value="prev-rank">Prev Rank (dropdown)</option>
           <option value="status">Status (dropdown)</option>
+          <option value="halfway">Halfway (dropdown)</option>
+          <option value="observations">Observations (dropdown)</option>
         </select>
       </div>
     </div>
