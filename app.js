@@ -503,75 +503,522 @@ const STATS_ADMIN_EMAILS = new Set([
   'saltbear1project.rt@gmail.com',
 ]);
 
-async function initStatsApp() {
-  applyTheme(state.theme);
-  const wrap = document.getElementById('stats-app');
+// ── Stats App State ───────────────────────────────
+
+const STAT_SECTIONS = [
+  { id: 'trial-moderator',  label: 'Trial Moderator' },
+  { id: 'moderator',        label: 'Moderator' },
+  { id: 'senior-moderator', label: 'Senior Moderator' },
+  { id: 'helper',           label: 'Helper' },
+];
+
+const statState = {
+  activeView: 'tracker',
+  activeSection: 'trial-moderator',
+  trackerExpanded: true,
+  months: [],
+  activeMonth: null,
+  isAdmin: false,
+  userEmail: '',
+};
+
+async function statApi(path, method, body) {
   const session = getStoredSession();
-  const email = session?.email || '';
-  const isAdmin = STATS_ADMIN_EMAILS.has(email);
-
-  try {
-    const data = await api('/api/data');
-    state.members = data.members || [];
-  } catch (e) { console.error(e); }
-
-  renderStatsApp(isAdmin, email);
-  wrap.classList.remove('app-hidden');
-  wrap.classList.add('app-visible');
+  const headers = { 'Content-Type': 'application/json' };
+  if (session) headers['Authorization'] = `Bearer ${session.access_token}`;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(`${method} ${path} → ${res.status}`);
+  return res.json();
 }
 
-function renderStatsApp(isAdmin, email) {
-  const wrap = document.getElementById('stats-app');
-  const statsMembers = state.members.filter(m => m.access === 'stats' || m.access === 'both');
+async function initStatsApp() {
+  applyTheme(state.theme);
+  const session = getStoredSession();
+  statState.userEmail = session?.email || '';
+  statState.isAdmin = STATS_ADMIN_EMAILS.has(statState.userEmail);
 
-  wrap.innerHTML = `
-    <div class="stats-portal-wrap">
-      <div class="stats-portal-header">
-        <img src="brand_assets/risklogo.png" alt="Risk Universalis" style="height:32px;width:auto;" onerror="this.style.display='none'" />
-        <div>
-          <h1 style="font-size:20px;font-weight:600;color:var(--text)">Master Statistics</h1>
-          <p style="font-size:12px;color:var(--text-3)">Risk Universalis</p>
-        </div>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          ${isAdmin ? `<button class="btn-primary" onclick="openStatsInviteModal()">+ Add User</button>` : ''}
-          <button class="btn-ghost" onclick="signOut()">Sign Out</button>
-        </div>
-      </div>
-      <div class="stats-portal-body">
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:24px">Signed in as <strong>${email}</strong></p>
-        ${isAdmin ? `
-          <div style="margin-bottom:32px">
-            <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Users with Master Statistics access</p>
-            ${statsMembers.length === 0
-              ? `<p style="font-size:13px;color:var(--text-3)">No users added yet.</p>`
-              : `<div class="stats-user-list">
-                  ${statsMembers.map(m => `
-                    <div class="stats-user-row">
-                      <div class="stats-user-info">
-                        <span class="stats-user-name">${m.name}</span>
-                        <span class="stats-user-email">${m.email}</span>
-                      </div>
-                      <span class="stats-access-badge ${m.access === 'both' ? 'badge-both' : 'badge-stats'}">${m.access === 'both' ? 'Dir + Stats' : 'Stats only'}</span>
-                      <button class="btn-ghost btn-sm" onclick="removeStatsMember('${m.id}','${m.name}')">Remove</button>
-                    </div>
-                  `).join('')}
-                </div>`
-            }
-          </div>
-        ` : ''}
-        <p style="color:var(--text-3);font-size:13px">Master Statistics content is coming soon.</p>
-      </div>
+  try {
+    const data = await statApi('/api/stat-data', 'GET');
+    state.members  = data.members || [];
+    statState.months = data.months || [];
+  } catch (e) { console.error(e); }
+
+  const sectionMonths = statState.months.filter(m => m.section === statState.activeSection);
+  statState.activeMonth = sectionMonths[0]?.id || null;
+
+  const wrap = document.getElementById('stats-app');
+  wrap.innerHTML = renderStatsShell();
+  wrap.classList.remove('app-hidden');
+  wrap.classList.add('app-visible');
+  bindStatsEvents();
+  renderStatsMain();
+}
+
+function renderStatsShell() {
+  return `
+    <div class="stats-shell">
+      <aside class="stats-sidebar" id="stats-sidebar">${renderStatsSidebar()}</aside>
+      <main class="stats-main" id="stats-main"></main>
     </div>
   `;
+}
+
+function renderStatsSidebar() {
+  const { activeView, activeSection, trackerExpanded, isAdmin, userEmail } = statState;
+  const member = state.members.find(m => m.email === userEmail);
+  const name = member?.name || userEmail.split('@')[0];
+
+  return `
+    <div class="stats-sidebar-top">
+      <div class="stats-sidebar-header">
+        <div class="stats-sidebar-brand">Master Statistics</div>
+        <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme"></button>
+      </div>
+      <div class="stats-sidebar-logo-wrap">
+        <img src="brand_assets/risklogo.png" alt="Risk Universalis" class="stats-sidebar-logo" onerror="this.style.display='none'" />
+      </div>
+      <nav class="stats-nav">
+        <button class="stats-nav-item ${activeView === 'statistics' ? 'active' : ''}" onclick="statNavigate('statistics')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Statistics
+        </button>
+        <button class="stats-nav-item ${activeView === 'tracker' ? 'active' : ''}" onclick="toggleStatTracker()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="23 11 17 11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
+          Tracker
+          <svg class="stats-nav-chevron ${trackerExpanded ? 'open' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        ${trackerExpanded ? `
+          <div class="stats-nav-children">
+            ${STAT_SECTIONS.map(s => `
+              <button class="stats-nav-child ${activeSection === s.id && activeView === 'tracker' ? 'active' : ''}" onclick="statSelectSection('${s.id}')">
+                ${s.label}
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
+        ${isAdmin ? `
+          <button class="stats-nav-item" onclick="statNavigate('users')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Users
+          </button>
+        ` : ''}
+      </nav>
+    </div>
+    <div class="stats-sidebar-foot">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div class="team-avatar" style="width:26px;height:26px;min-width:26px;font-size:10px;background:${getAvatarColor(name)}">${getInitials(name)}</div>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</p>
+          <p style="font-size:10px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${userEmail}</p>
+        </div>
+      </div>
+      ${isAdmin ? `<button class="btn-ghost btn-sm" style="width:100%;margin-bottom:4px" onclick="switchToDirectoryPortal()">Switch to Directory</button>` : ''}
+      <button class="btn-ghost btn-sm" style="width:100%" onclick="signOut()">Sign Out</button>
+    </div>
+  `;
+}
+
+function bindStatsEvents() {
+  document.getElementById('stats-app').addEventListener('click', handleStatsClick);
+}
+
+function handleStatsClick(e) {
+  const el = e.target.closest('[data-stat-action]');
+  if (!el) return;
+  const action = el.dataset.statAction;
+
+  switch (action) {
+    case 'inline-username': {
+      if (el.querySelector('input')) return;
+      const origText = el.textContent;
+      const entryId = el.dataset.entryId;
+      const monthId = el.dataset.monthId;
+      const input = document.createElement('input');
+      input.className = 'tracker-inline-input';
+      input.value = origText;
+      el.textContent = '';
+      el.appendChild(input);
+      input.focus(); input.select();
+      const save = () => {
+        const val = input.value.trim() || origText;
+        el.textContent = val;
+        const month = statState.months.find(m => m.id === monthId);
+        const entry = month?.entries.find(e => e.id === entryId);
+        if (entry) entry.username = val;
+        statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, username: val });
+      };
+      input.addEventListener('blur', save);
+      input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+        if (ev.key === 'Escape') { input.removeEventListener('blur', save); el.textContent = origText; }
+      });
+      break;
+    }
+    case 'inline-value': {
+      if (el.querySelector('input')) return;
+      const origText = el.textContent;
+      const entryId = el.dataset.entryId;
+      const colId   = el.dataset.colId;
+      const colType = el.dataset.colType;
+      const monthId = el.dataset.monthId;
+      const input = document.createElement('input');
+      input.className = 'tracker-inline-input';
+      input.type = colType === 'number' ? 'number' : 'text';
+      input.value = origText;
+      el.textContent = '';
+      el.appendChild(input);
+      input.focus(); input.select();
+      const save = () => {
+        const rawVal = input.value.trim();
+        const val = colType === 'number' ? (parseFloat(rawVal) || 0) : rawVal;
+        el.textContent = val;
+        const month = statState.months.find(m => m.id === monthId);
+        const entry = month?.entries.find(e => e.id === entryId);
+        if (entry) {
+          entry.values = { ...entry.values, [colId]: val };
+          statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, values: entry.values });
+        }
+      };
+      input.addEventListener('blur', save);
+      input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+        if (ev.key === 'Escape') { input.removeEventListener('blur', save); el.textContent = origText; }
+      });
+      break;
+    }
+    case 'delete-entry': {
+      const entryId = el.dataset.entryId;
+      const monthId = el.dataset.monthId;
+      const month = statState.months.find(m => m.id === monthId);
+      if (!month) return;
+      month.entries = month.entries.filter(e => e.id !== entryId);
+      renderStatsMain();
+      statApi('/api/stat-tracker-entries', 'DELETE', { id: entryId });
+      break;
+    }
+    case 'delete-col': {
+      const colId   = el.dataset.colId;
+      const monthId = el.dataset.monthId;
+      const month = statState.months.find(m => m.id === monthId);
+      if (!month) return;
+      month.columns = month.columns.filter(c => c.id !== colId);
+      month.entries.forEach(e => { delete e.values[colId]; });
+      renderStatsMain();
+      statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
+      break;
+    }
+  }
+}
+
+function statNavigate(view) {
+  statState.activeView = view;
+  renderStatsSidebarEl();
+  renderStatsMain();
+}
+
+function toggleStatTracker() {
+  if (statState.activeView !== 'tracker') {
+    statState.activeView = 'tracker';
+    statState.trackerExpanded = true;
+  } else {
+    statState.trackerExpanded = !statState.trackerExpanded;
+  }
+  renderStatsSidebarEl();
+  renderStatsMain();
+}
+
+function statSelectSection(sectionId) {
+  statState.activeView = 'tracker';
+  statState.activeSection = sectionId;
+  statState.trackerExpanded = true;
+  const sectionMonths = statState.months.filter(m => m.section === sectionId);
+  statState.activeMonth = sectionMonths[0]?.id || null;
+  renderStatsSidebarEl();
+  renderStatsMain();
+}
+
+function renderStatsSidebarEl() {
+  const el = document.getElementById('stats-sidebar');
+  if (el) el.innerHTML = renderStatsSidebar();
+}
+
+function renderStatsMain() {
+  const el = document.getElementById('stats-main');
+  if (!el) return;
+
+  if (statState.activeView === 'statistics') {
+    el.innerHTML = `<h2 style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Statistics</h2><p style="color:var(--text-3);font-size:13px">Statistics content coming soon.</p>`;
+    return;
+  }
+
+  if (statState.activeView === 'users') {
+    renderStatsUsersView(el);
+    return;
+  }
+
+  const section = STAT_SECTIONS.find(s => s.id === statState.activeSection);
+  const sectionMonths = statState.months.filter(m => m.section === statState.activeSection);
+  const activeMonth = sectionMonths.find(m => m.id === statState.activeMonth) || sectionMonths[0] || null;
+  if (activeMonth && statState.activeMonth !== activeMonth.id) statState.activeMonth = activeMonth.id;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:600;color:var(--text)">${section?.label || 'Tracker'}</h2>
+    </div>
+    <div class="stats-tracker-header">
+      <div class="stats-month-tabs">
+        ${sectionMonths.map(m => `
+          <button class="stats-month-tab ${m.id === activeMonth?.id ? 'active' : ''}" onclick="statSelectMonth('${m.id}')">${m.name}</button>
+        `).join('')}
+        <button class="stats-month-tab" onclick="openAddStatMonthModal()">+ Month</button>
+      </div>
+      ${activeMonth ? `
+        <div class="stats-tracker-actions">
+          <button class="btn-ghost btn-sm" onclick="openDuplicateMonthModal('${activeMonth.id}','${activeMonth.name.replace(/'/g,"\\'")}')">Duplicate</button>
+          <button class="btn-ghost btn-sm" onclick="openAddStatColumnModal('${activeMonth.id}')">+ Column</button>
+          <button class="btn-primary btn-sm" onclick="openAddStatEntryModal('${activeMonth.id}')">+ Entry</button>
+          <button class="btn-ghost btn-sm" style="color:var(--urgent)" onclick="deleteStatMonth('${activeMonth.id}')">Delete</button>
+        </div>
+      ` : ''}
+    </div>
+    ${activeMonth ? renderStatsTrackerTable(activeMonth) : `<p style="color:var(--text-3);font-size:13px;margin-top:16px">No months yet — click "+ Month" to get started.</p>`}
+  `;
+}
+
+function renderStatsUsersView(el) {
+  const statsMembers = state.members.filter(m => m.access === 'stats' || m.access === 'both');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:600;color:var(--text)">Users</h2>
+      <button class="btn-primary" onclick="openStatsInviteModal()">+ Add User</button>
+    </div>
+    ${statsMembers.length === 0
+      ? `<p style="color:var(--text-3);font-size:13px">No users added yet.</p>`
+      : `<div class="stats-user-list">
+          ${statsMembers.map(m => `
+            <div class="stats-user-row">
+              <div class="stats-user-info">
+                <span class="stats-user-name">${m.name}</span>
+                <span class="stats-user-email">${m.email}</span>
+              </div>
+              <span class="stats-access-badge ${m.access === 'both' ? 'badge-both' : 'badge-stats'}">${m.access === 'both' ? 'Dir + Stats' : 'Stats only'}</span>
+              <button class="btn-ghost btn-sm" onclick="removeStatsMember('${m.id}','${m.name.replace(/'/g,"\\'")}')">Remove</button>
+            </div>
+          `).join('')}
+        </div>`
+    }
+  `;
+}
+
+function renderStatsTrackerTable(month) {
+  const cols = month.columns || [];
+  const entries = month.entries || [];
+  return `
+    <div class="tracker-table-wrap" style="margin-top:0">
+      <table class="tracker-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;min-width:130px">Username</th>
+            ${cols.map(c => `
+              <th class="stat-col-header">
+                ${c.name}
+                <button class="stat-col-del" data-stat-action="delete-col" data-col-id="${c.id}" data-month-id="${month.id}">×</button>
+              </th>
+            `).join('')}
+            <th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.length === 0
+            ? `<tr><td colspan="${cols.length + 2}" style="text-align:center;padding:24px;color:var(--text-3)">No entries — click "+ Entry" to add one.</td></tr>`
+            : entries.map(e => renderStatEntry(e, month, cols)).join('')
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderStatEntry(entry, month, cols) {
+  return `
+    <tr>
+      <td class="tracker-editable" data-stat-action="inline-username" data-entry-id="${entry.id}" data-month-id="${month.id}">${entry.username}</td>
+      ${cols.map(c => `
+        <td class="tracker-num tracker-editable"
+            data-stat-action="inline-value"
+            data-entry-id="${entry.id}"
+            data-col-id="${c.id}"
+            data-col-type="${c.type}"
+            data-month-id="${month.id}">${entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '')}</td>
+      `).join('')}
+      <td style="text-align:right">
+        <button class="icon-btn" data-stat-action="delete-entry" data-entry-id="${entry.id}" data-month-id="${month.id}" title="Delete">×</button>
+      </td>
+    </tr>
+  `;
+}
+
+function statSelectMonth(monthId) {
+  statState.activeMonth = monthId;
+  renderStatsMain();
+}
+
+function openAddStatMonthModal() {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">New Month</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Month Name</label>
+        <input type="text" class="form-input" id="stat-month-name" placeholder="e.g. May 2026" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmAddStatMonth()">Create</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('stat-month-name')?.focus(), 50);
+}
+
+async function confirmAddStatMonth() {
+  const name = document.getElementById('stat-month-name')?.value.trim();
+  if (!name) { document.getElementById('stat-month-name').style.borderColor = 'var(--urgent)'; return; }
+  try {
+    const month = await statApi('/api/stat-tracker-months', 'POST', { section: statState.activeSection, name });
+    statState.months.push(month);
+    statState.activeMonth = month.id;
+    closeModal();
+    renderStatsMain();
+  } catch (e) { console.error(e); }
+}
+
+function openDuplicateMonthModal(sourceId, sourceName) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Duplicate Month</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">Copies all columns from <strong>${sourceName}</strong> into a new month (entries are not copied).</p>
+      <div class="form-row">
+        <label class="form-label">New Month Name</label>
+        <input type="text" class="form-input" id="dup-month-name" placeholder="e.g. June 2026" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmDuplicateMonth('${sourceId}')">Duplicate</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('dup-month-name')?.focus(), 50);
+}
+
+async function confirmDuplicateMonth(sourceId) {
+  const name = document.getElementById('dup-month-name')?.value.trim();
+  if (!name) { document.getElementById('dup-month-name').style.borderColor = 'var(--urgent)'; return; }
+  try {
+    const month = await statApi('/api/stat-tracker-months', 'POST', { section: statState.activeSection, name, duplicateFrom: sourceId });
+    statState.months.push(month);
+    statState.activeMonth = month.id;
+    closeModal();
+    renderStatsMain();
+  } catch (e) { console.error(e); }
+}
+
+async function deleteStatMonth(monthId) {
+  if (!confirm('Delete this month and all its entries?')) return;
+  try {
+    await statApi('/api/stat-tracker-months', 'DELETE', { id: monthId });
+    statState.months = statState.months.filter(m => m.id !== monthId);
+    const remaining = statState.months.filter(m => m.section === statState.activeSection);
+    statState.activeMonth = remaining[0]?.id || null;
+    renderStatsMain();
+  } catch (e) { console.error(e); }
+}
+
+function openAddStatColumnModal(monthId) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Add Column</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Column Name</label>
+        <input type="text" class="form-input" id="stat-col-name" placeholder="e.g. Warnings" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Type</label>
+        <select class="form-select" id="stat-col-type">
+          <option value="number">Number</option>
+          <option value="text">Text</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmAddStatColumn('${monthId}')">Add</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('stat-col-name')?.focus(), 50);
+}
+
+async function confirmAddStatColumn(monthId) {
+  const name = document.getElementById('stat-col-name')?.value.trim();
+  const type = document.getElementById('stat-col-type')?.value || 'number';
+  if (!name) { document.getElementById('stat-col-name').style.borderColor = 'var(--urgent)'; return; }
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  const col = { id: (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)), name, type };
+  month.columns = [...(month.columns || []), col];
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
+}
+
+function openAddStatEntryModal(monthId) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Add Entry</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-input" id="stat-entry-username" placeholder="Roblox username" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmAddStatEntry('${monthId}')">Add</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('stat-entry-username')?.focus(), 50);
+}
+
+async function confirmAddStatEntry(monthId) {
+  const username = document.getElementById('stat-entry-username')?.value.trim();
+  if (!username) { document.getElementById('stat-entry-username').style.borderColor = 'var(--urgent)'; return; }
+  try {
+    const entry = await statApi('/api/stat-tracker-entries', 'POST', { monthId, username });
+    const month = statState.months.find(m => m.id === monthId);
+    if (month) month.entries = [...month.entries, entry].sort((a, b) => a.username.localeCompare(b.username));
+    closeModal();
+    renderStatsMain();
+  } catch (e) { console.error(e); }
 }
 
 async function removeStatsMember(id, name) {
   if (!confirm(`Remove ${name} from Master Statistics?`)) return;
   try {
-    await api('/api/members', 'DELETE', { id });
+    await statApi('/api/members', 'DELETE', { id });
     state.members = state.members.filter(m => m.id !== id);
-    const session = getStoredSession();
-    renderStatsApp(STATS_ADMIN_EMAILS.has(session?.email || ''), session?.email || '');
+    renderStatsMain();
   } catch (e) { console.error(e); }
 }
 
@@ -596,6 +1043,7 @@ function openStatsInviteModal() {
       <button class="btn-primary" onclick="confirmStatsInvite()">Add User</button>
     </div>
   `);
+  setTimeout(() => document.getElementById('si-name')?.focus(), 50);
 }
 
 async function confirmStatsInvite() {
@@ -607,12 +1055,30 @@ async function confirmStatsInvite() {
     return;
   }
   try {
-    const member = await api('/api/members', 'POST', { name, email, role: 'Viewer', access: 'stats' });
+    const member = await statApi('/api/members', 'POST', { name, email, role: 'Viewer', access: 'stats' });
     state.members.push(member);
     closeModal();
-    const session = getStoredSession();
-    renderStatsApp(STATS_ADMIN_EMAILS.has(session?.email || ''), session?.email || '');
+    renderStatsMain();
   } catch (e) { console.error(e); }
+}
+
+function switchToDirectoryPortal() {
+  const session = getStoredSession();
+  if (session) { session.portal = 'directory'; localStorage.setItem('ru_session', JSON.stringify(session)); }
+  const statsApp = document.getElementById('stats-app');
+  statsApp.classList.add('app-hidden');
+  statsApp.classList.remove('app-visible');
+  statsApp.innerHTML = '';
+  initApp();
+}
+
+function switchToStatsPortal() {
+  const session = getStoredSession();
+  if (session) { session.portal = 'stats'; localStorage.setItem('ru_session', JSON.stringify(session)); }
+  document.getElementById('app').classList.add('app-hidden');
+  document.getElementById('app').classList.remove('app-visible');
+  closeModal();
+  initStatsApp();
 }
 
 function bindAppEvents() {
@@ -2569,6 +3035,14 @@ function openEditMemberModal(member) {
         </select>
       </div>
       <div class="form-row">
+        <label class="form-label">Portal Access</label>
+        <select class="form-select" id="edit-mem-access">
+          <option value="directory" ${(member.access || 'directory') === 'directory' ? 'selected' : ''}>Directory only</option>
+          <option value="stats"     ${member.access === 'stats'     ? 'selected' : ''}>Master Statistics only</option>
+          <option value="both"      ${member.access === 'both'      ? 'selected' : ''}>Directory &amp; Master Statistics</option>
+        </select>
+      </div>
+      <div class="form-row">
         <label class="form-label" style="color:var(--text-3)">Email (cannot be changed)</label>
         <input type="text" class="form-input" value="${member.email}" disabled style="opacity:0.5" />
       </div>
@@ -2582,13 +3056,14 @@ function openEditMemberModal(member) {
 }
 
 async function confirmEditMember(memberId) {
-  const name = document.getElementById('edit-mem-name')?.value.trim();
-  const role = document.getElementById('edit-mem-role')?.value;
+  const name   = document.getElementById('edit-mem-name')?.value.trim();
+  const role   = document.getElementById('edit-mem-role')?.value;
+  const access = document.getElementById('edit-mem-access')?.value;
   if (!name) return;
   const member = state.members.find(m => m.id === memberId);
-  if (member) { member.name = name; member.role = role; }
+  if (member) { member.name = name; member.role = role; if (access) member.access = access; }
   closeModal(); renderTeamList(); renderView();
-  api('/api/members', 'PATCH', { id: memberId, name, role }).catch(console.error);
+  api('/api/members', 'PATCH', { id: memberId, name, role, access }).catch(console.error);
 }
 
 function openEditChartModal(channel, chart) {
@@ -2684,6 +3159,7 @@ function openSettingsModal() {
     </div>
     <div class="modal-footer">
       <button class="btn-danger" onclick="signOut()">Sign Out</button>
+      ${STATS_ADMIN_EMAILS.has(email) ? `<button class="btn-ghost" onclick="switchToStatsPortal()">Switch to Master Statistics</button>` : ''}
       <button class="btn-ghost" onclick="closeModal()">Close</button>
     </div>
   `);

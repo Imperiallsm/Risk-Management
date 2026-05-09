@@ -51,11 +51,12 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === 'PATCH') {
-    const { id, name, role } = req.body || {};
+    const { id, name, role, access } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (role !== undefined) updates.role = role;
+    if (access !== undefined) updates.access = access;
     const { error } = await sb.from('members').update(updates).eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ success: true });
