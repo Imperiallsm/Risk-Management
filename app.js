@@ -886,26 +886,34 @@ function renderStatsMain() {
 
 function renderStatsUsersView(el) {
   const statsMembers = state.members.filter(m => m.access === 'stats' || m.access === 'both');
+  const cards = statsMembers.map(m => `
+    <div class="member-card">
+      ${statState.isAdmin ? `
+        <div class="member-card-actions">
+          <button class="delete-btn member-delete-btn" onclick="removeStatsMember('${m.id}','${m.name.replace(/'/g,"\\'")}')">×</button>
+        </div>` : ''}
+      ${state.profiles[m.email]
+        ? `<img src="${state.profiles[m.email]}" alt="${m.name}" class="member-avatar avatar-img" />`
+        : `<div class="member-avatar" style="background:${getAvatarColor(m.name)}">${getInitials(m.name)}</div>`}
+      <div class="member-name">${m.name}</div>
+      <div class="member-role-pill">${m.access === 'both' ? 'Dir + Stats' : 'Stats only'}</div>
+      <div class="member-meta">
+        ${statState.isAdmin ? `<div>${m.email}</div>` : ''}
+        <div>Joined ${formatDateShort(m.joinDate)}</div>
+      </div>
+    </div>
+  `).join('');
   el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <h2 style="font-size:18px;font-weight:600;color:var(--text)">Users</h2>
-      <button class="btn-primary" onclick="openStatsInviteModal()">+ Add User</button>
+    <div class="page-header">
+      <div class="page-title-block">
+        <h1 class="page-title">Users</h1>
+        <p class="page-date">${statsMembers.length} user${statsMembers.length !== 1 ? 's' : ''}</p>
+      </div>
+      ${statState.isAdmin ? `<button class="btn-primary" onclick="openStatsInviteModal()">+ Add User</button>` : ''}
     </div>
     ${statsMembers.length === 0
       ? `<p style="color:var(--text-3);font-size:13px">No users added yet.</p>`
-      : `<div class="stats-user-list">
-          ${statsMembers.map(m => `
-            <div class="stats-user-row">
-              <div class="stats-user-info">
-                <span class="stats-user-name">${m.name}</span>
-                <span class="stats-user-email">${m.email}</span>
-              </div>
-              <span class="stats-access-badge ${m.access === 'both' ? 'badge-both' : 'badge-stats'}">${m.access === 'both' ? 'Dir + Stats' : 'Stats only'}</span>
-              <button class="btn-ghost btn-sm" onclick="removeStatsMember('${m.id}','${m.name.replace(/'/g,"\\'")}')">Remove</button>
-            </div>
-          `).join('')}
-        </div>`
-    }
+      : `<div class="members-grid">${cards}</div>`}
   `;
 }
 
@@ -937,13 +945,19 @@ async function renderStatsHistoryView(el) {
               + ' · ' + when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
             const actionColor = h.action === 'deleted' ? 'var(--urgent)' : h.action === 'edited' ? '#2563eb' : 'var(--safe)';
             const sectionLabel = h.section ? h.section.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+            const avatarUrl = state.profiles[h.actor_email];
+            const actorName = h.actor_name || h.actor_email;
+            const avatarHtml = avatarUrl
+              ? `<img src="${avatarUrl}" class="history-actor-avatar avatar-img" alt="${actorName}" />`
+              : `<div class="history-actor-avatar" style="background:${getAvatarColor(actorName)}">${getInitials(actorName)}</div>`;
             return `
               <div class="stat-history-row">
                 <div class="stat-history-left">
+                  ${avatarHtml}
                   <span class="stat-history-badge" style="background:${actionColor}20;color:${actionColor}">${h.action}</span>
                   <div>
                     <p class="stat-history-main">
-                      <strong>${h.actor_name || h.actor_email}</strong>
+                      <strong>${actorName}</strong>
                       ${h.action} <em>${h.entity_type}</em>
                       ${h.entity_label ? `<strong>"${h.entity_label}"</strong>` : ''}
                       ${h.month_name ? `in <strong>${h.month_name}</strong>` : ''}
@@ -2456,7 +2470,8 @@ function renderInvoices() {
 
 function renderMembers() {
   const isAdmin = STATS_ADMIN_EMAILS.has(getStoredSession()?.email || '');
-  const cards = state.members.map(m => `
+  const directoryMembers = state.members.filter(m => m.access === 'directory' || m.access === 'both');
+  const cards = directoryMembers.map(m => `
     <div class="member-card">
       <div class="member-card-actions">
         ${isAdmin ? `<button class="icon-btn" data-action="edit-member" data-member-id="${m.id}" title="Edit member">${PENCIL_ICON}</button>
@@ -2477,7 +2492,7 @@ function renderMembers() {
     <div class="page-header">
       <div class="page-title-block">
         <h1 class="page-title">Members</h1>
-        <p class="page-date">${state.members.length} member${state.members.length !== 1 ? 's' : ''}</p>
+        <p class="page-date">${directoryMembers.length} member${directoryMembers.length !== 1 ? 's' : ''}</p>
       </div>
       ${isAdmin ? `
       <button class="btn-primary" data-action="invite-member">
