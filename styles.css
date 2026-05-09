@@ -553,6 +553,15 @@ body {
 }
 .stat-col-name:hover { text-decoration: underline; text-underline-offset: 2px; }
 
+/* Stat entry username link */
+.stat-entry-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-2);
+}
+.stat-entry-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
 /* Column dividers */
 .stat-col-dividers th,
 .stat-col-dividers td { border-right: 1px solid var(--border); }

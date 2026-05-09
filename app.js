@@ -1088,12 +1088,15 @@ function renderStatDropdownCell(c, entry, month) {
 
 function renderStatEntry(entry, month, cols) {
   const notes = entry.values.__notes__ || '';
+  const link  = entry.values.__link__  || '';
   const statusCol = cols.find(c => c.type === 'status');
   const statusVal = statusCol ? (entry.values[statusCol.id] || '') : '';
   const rowCls = STATUS_ROW_CLASS[statusVal] || '';
   return `
     <tr class="${rowCls}" title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
-      <td class="tracker-editable" data-stat-action="inline-username" data-entry-id="${entry.id}" data-month-id="${month.id}">${entry.username}</td>
+      <td class="tracker-editable" data-stat-action="inline-username" data-entry-id="${entry.id}" data-month-id="${month.id}">
+        ${link ? `<a href="${link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" class="stat-entry-link" onclick="event.stopPropagation()">${entry.username}</a>` : entry.username}
+      </td>
       ${cols.map(c => {
         if (DROPDOWN_OPTION_MAP[c.type]) return renderStatDropdownCell(c, entry, month);
         const val = entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '');
@@ -1143,6 +1146,7 @@ function openEditStatEntryModal(entryId, monthId) {
   if (!month || !entry) return;
   const cols = month.columns || [];
   const notes = entry.values.__notes__ || '';
+  const link  = entry.values.__link__  || '';
   openModal(`
     <div class="modal-header">
       <span class="modal-title">Edit Entry</span>
@@ -1153,12 +1157,27 @@ function openEditStatEntryModal(entryId, monthId) {
         <label class="form-label">Username</label>
         <input type="text" class="form-input" id="se-username" value="${entry.username}" />
       </div>
-      ${cols.map(c => `
-        <div class="form-row">
+      <div class="form-row">
+        <label class="form-label">Freedcamp Link <span style="color:var(--urgent)">*</span></label>
+        <input type="url" class="form-input" id="se-link" value="${link.replace(/"/g,'&quot;')}" placeholder="https://freedcamp.com/..." />
+      </div>
+      ${cols.map(c => {
+        if (DROPDOWN_OPTION_MAP[c.type]) {
+          const options = DROPDOWN_OPTION_MAP[c.type];
+          const val = entry.values[c.id] || '';
+          return `<div class="form-row">
+            <label class="form-label">${c.name}</label>
+            <select class="form-select" id="se-col-${c.id}">
+              <option value="">—</option>
+              ${options.map(o => `<option value="${o.value}" ${val === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+            </select>
+          </div>`;
+        }
+        return `<div class="form-row">
           <label class="form-label">${c.name}</label>
           <input type="${c.type === 'number' ? 'number' : 'text'}" class="form-input" id="se-col-${c.id}" value="${entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '')}" />
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
       <div class="form-row">
         <label class="form-label">Notes</label>
         <textarea class="form-input" id="se-notes" rows="3" style="resize:vertical;font-family:inherit">${notes}</textarea>
@@ -1178,7 +1197,8 @@ async function confirmEditStatEntry(entryId, monthId) {
   if (!month || !entry) return;
   const username = document.getElementById('se-username')?.value.trim() || entry.username;
   const notes    = document.getElementById('se-notes')?.value || '';
-  const newValues = { ...entry.values, __notes__: notes };
+  const link     = document.getElementById('se-link')?.value.trim() || '';
+  const newValues = { ...entry.values, __notes__: notes, __link__: link };
   (month.columns || []).forEach(c => {
     const el = document.getElementById(`se-col-${c.id}`);
     if (el) newValues[c.id] = c.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
@@ -1401,6 +1421,10 @@ function openAddStatEntryModal(monthId) {
         <label class="form-label">Username</label>
         <input type="text" class="form-input" id="stat-entry-username" placeholder="Roblox username" />
       </div>
+      <div class="form-row">
+        <label class="form-label">Freedcamp Link <span style="color:var(--urgent)">*</span></label>
+        <input type="url" class="form-input" id="stat-entry-link" placeholder="https://freedcamp.com/..." />
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
@@ -1412,9 +1436,13 @@ function openAddStatEntryModal(monthId) {
 
 async function confirmAddStatEntry(monthId) {
   const username = document.getElementById('stat-entry-username')?.value.trim();
+  const link     = document.getElementById('stat-entry-link')?.value.trim();
   if (!username) { document.getElementById('stat-entry-username').style.borderColor = 'var(--urgent)'; return; }
+  if (!link)     { document.getElementById('stat-entry-link').style.borderColor = 'var(--urgent)'; return; }
   try {
     const entry = await statApi('/api/stat-tracker-entries', 'POST', { monthId, username });
+    entry.values = { __link__: link };
+    await statApi('/api/stat-tracker-entries', 'PATCH', { id: entry.id, values: entry.values });
     const month = statState.months.find(m => m.id === monthId);
     if (month) month.entries = [...month.entries, entry].sort((a, b) => a.username.localeCompare(b.username));
     closeModal();
