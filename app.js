@@ -875,7 +875,7 @@ function renderStatsMain() {
             <button class="btn-ghost btn-sm" onclick="openValueSettingsModal('${activeMonth.id}')">Value Settings</button>
             <button class="btn-ghost btn-sm" onclick="enterExportMode()">Export</button>
             <button class="btn-primary btn-sm" onclick="openAddStatEntryModal('${activeMonth.id}')">+ Entry</button>
-            <button class="btn-ghost btn-sm" style="color:var(--urgent)" onclick="deleteStatMonth('${activeMonth.id}')">Delete</button>
+            ${statState.isAdmin ? `<button class="btn-ghost btn-sm" style="color:var(--urgent)" onclick="deleteStatMonth('${activeMonth.id}')">Delete</button>` : ''}
           `}
         </div>
       ` : ''}
