@@ -860,16 +860,17 @@ function renderStatsMain() {
           <button class="stats-month-tab ${m.id === activeMonth?.id ? 'active' : ''}" onclick="statSelectMonth('${m.id}')">${m.name}</button>
         `).join('')}
         <button class="stats-month-tab" onclick="openAddStatMonthModal()">+ Month</button>
+        ${activeMonth ? `<button class="stats-month-tab" onclick="openDuplicateMonthModal('${activeMonth.id}','${activeMonth.name.replace(/'/g,"\\'")}')">Duplicate</button>` : ''}
       </div>
       ${activeMonth ? `
         <div class="stats-tracker-actions">
           ${statState.exportMode ? `
             <button class="btn-ghost btn-sm" onclick="selectAllExport('${activeMonth.id}')">Select All</button>
             <button class="btn-ghost btn-sm" onclick="deselectAllExport()">Deselect All</button>
-            <button class="btn-primary btn-sm" onclick="downloadExport('${activeMonth.id}')">Download CSV</button>
+            <button class="btn-primary btn-sm" onclick="downloadExport('${activeMonth.id}','csv')">Download CSV</button>
+            <button class="btn-primary btn-sm" onclick="downloadExport('${activeMonth.id}','txt')">Download TXT</button>
             <button class="btn-ghost btn-sm" onclick="exitExportMode()">Cancel</button>
           ` : `
-            <button class="btn-ghost btn-sm" onclick="openDuplicateMonthModal('${activeMonth.id}','${activeMonth.name.replace(/'/g,"\\'")}')">Duplicate</button>
             <button class="btn-ghost btn-sm" onclick="openAddStatColumnModal('${activeMonth.id}')">+ Column</button>
             <button class="btn-ghost btn-sm" onclick="openValueSettingsModal('${activeMonth.id}')">Value Settings</button>
             <button class="btn-ghost btn-sm" onclick="enterExportMode()">Export</button>
@@ -994,7 +995,7 @@ function deselectAllExport() {
   renderStatsMain();
 }
 
-function downloadExport(monthId) {
+function downloadExport(monthId, format = 'csv') {
   const month = statState.months.find(m => m.id === monthId);
   if (!month) return;
   const cols = month.columns || [];
@@ -1003,21 +1004,51 @@ function downloadExport(monthId) {
     .sort((a, b) => a.username.localeCompare(b.username));
   if (!entries.length) { alert('Select at least one entry to export.'); return; }
 
-  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const headers = ['Username', 'Freedcamp Link', ...cols.map(c => c.name), 'Notes'];
-  const rows = entries.map(e => [
-    escape(e.username),
-    escape(e.values.__link__ || ''),
-    ...cols.map(c => escape(e.values[c.id] ?? '')),
-    escape(e.values.__notes__ || ''),
-  ]);
+  let content, mime, ext;
 
-  const csv = [headers.map(escape), ...rows].map(r => r.join(',')).join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  if (format === 'txt') {
+    const colWidths = headers.map((h, i) => {
+      const vals = entries.map(e => {
+        if (i === 0) return e.username;
+        if (i === 1) return e.values.__link__ || '';
+        if (i === headers.length - 1) return e.values.__notes__ || '';
+        return String(e.values[cols[i - 2]?.id] ?? '');
+      });
+      return Math.max(h.length, ...vals.map(v => v.length));
+    });
+    const pad = (s, w) => String(s ?? '').padEnd(w);
+    const divider = colWidths.map(w => '-'.repeat(w)).join('  ');
+    const headerRow = headers.map((h, i) => pad(h, colWidths[i])).join('  ');
+    const dataRows = entries.map(e =>
+      headers.map((h, i) => {
+        if (i === 0) return pad(e.username, colWidths[i]);
+        if (i === 1) return pad(e.values.__link__ || '', colWidths[i]);
+        if (i === headers.length - 1) return pad(e.values.__notes__ || '', colWidths[i]);
+        return pad(e.values[cols[i - 2]?.id] ?? '', colWidths[i]);
+      }).join('  ')
+    );
+    content = [`${month.name} — Export`, '', headerRow, divider, ...dataRows].join('\r\n');
+    mime = 'text/plain;charset=utf-8;';
+    ext = 'txt';
+  } else {
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = entries.map(e => [
+      escape(e.username),
+      escape(e.values.__link__ || ''),
+      ...cols.map(c => escape(e.values[c.id] ?? '')),
+      escape(e.values.__notes__ || ''),
+    ]);
+    content = [headers.map(escape), ...rows].map(r => r.join(',')).join('\r\n');
+    mime = 'text/csv;charset=utf-8;';
+    ext = 'csv';
+  }
+
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${month.name.replace(/[^a-z0-9]/gi,'_')}_export.csv`;
+  a.download = `${month.name.replace(/[^a-z0-9]/gi,'_')}_export.${ext}`;
   a.click();
   URL.revokeObjectURL(url);
   exitExportMode();
