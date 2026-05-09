@@ -541,8 +541,10 @@ async function initStatsApp() {
 
   try {
     const data = await statApi('/api/stat-data', 'GET');
-    state.members  = data.members || [];
-    statState.months = data.months || [];
+    state.members    = data.members  || [];
+    statState.months = data.months   || [];
+    state.channels   = data.channels || [];
+    state.activeChannel = state.channels[0]?.id || null;
   } catch (e) { console.error(e); }
 
   const sectionMonths = statState.months.filter(m => m.section === statState.activeSection);
@@ -622,6 +624,8 @@ function renderStatsSidebar() {
 
 function bindStatsEvents() {
   document.getElementById('stats-app').addEventListener('click', handleStatsClick);
+  document.getElementById('stats-main').addEventListener('click', handleMainClick);
+  document.getElementById('stats-main').addEventListener('change', handleMainChange);
 }
 
 function handleStatsClick(e) {
@@ -709,6 +713,14 @@ function handleStatsClick(e) {
       statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
       break;
     }
+    case 'edit-entry': {
+      openEditStatEntryModal(el.dataset.entryId, el.dataset.monthId);
+      break;
+    }
+    case 'rename-col': {
+      openRenameStatColumnModal(el.dataset.colId, el.dataset.monthId, el.dataset.colName);
+      break;
+    }
   }
 }
 
@@ -749,7 +761,8 @@ function renderStatsMain() {
   if (!el) return;
 
   if (statState.activeView === 'statistics') {
-    el.innerHTML = `<h2 style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Statistics</h2><p style="color:var(--text-3);font-size:13px">Statistics content coming soon.</p>`;
+    el.innerHTML = renderStatistics();
+    setTimeout(initCharts, 0);
     return;
   }
 
@@ -823,11 +836,11 @@ function renderStatsTrackerTable(month) {
             <th style="text-align:left;min-width:130px">Username</th>
             ${cols.map(c => `
               <th class="stat-col-header">
-                ${c.name}
+                <span class="stat-col-name" data-stat-action="rename-col" data-col-id="${c.id}" data-month-id="${month.id}" data-col-name="${c.name.replace(/"/g,'&quot;')}" title="Click to rename">${c.name}</span>
                 <button class="stat-col-del" data-stat-action="delete-col" data-col-id="${c.id}" data-month-id="${month.id}">×</button>
               </th>
             `).join('')}
-            <th style="width:50px"></th>
+            <th style="width:80px"></th>
           </tr>
         </thead>
         <tbody>
@@ -842,8 +855,9 @@ function renderStatsTrackerTable(month) {
 }
 
 function renderStatEntry(entry, month, cols) {
+  const notes = entry.values.__notes__ || '';
   return `
-    <tr>
+    <tr title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
       <td class="tracker-editable" data-stat-action="inline-username" data-entry-id="${entry.id}" data-month-id="${month.id}">${entry.username}</td>
       ${cols.map(c => `
         <td class="tracker-num tracker-editable"
@@ -853,11 +867,98 @@ function renderStatEntry(entry, month, cols) {
             data-col-type="${c.type}"
             data-month-id="${month.id}">${entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '')}</td>
       `).join('')}
-      <td style="text-align:right">
+      <td style="text-align:right;white-space:nowrap">
+        ${notes ? `<span style="color:var(--text-3);font-size:11px;margin-right:2px" title="${notes.replace(/"/g,'&quot;')}">📝</span>` : ''}
+        <button class="icon-btn" data-stat-action="edit-entry" data-entry-id="${entry.id}" data-month-id="${month.id}" title="Edit">${PENCIL_ICON}</button>
         <button class="icon-btn" data-stat-action="delete-entry" data-entry-id="${entry.id}" data-month-id="${month.id}" title="Delete">×</button>
       </td>
     </tr>
   `;
+}
+
+function openEditStatEntryModal(entryId, monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (!month || !entry) return;
+  const cols = month.columns || [];
+  const notes = entry.values.__notes__ || '';
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Edit Entry</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-input" id="se-username" value="${entry.username}" />
+      </div>
+      ${cols.map(c => `
+        <div class="form-row">
+          <label class="form-label">${c.name}</label>
+          <input type="${c.type === 'number' ? 'number' : 'text'}" class="form-input" id="se-col-${c.id}" value="${entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '')}" />
+        </div>
+      `).join('')}
+      <div class="form-row">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input" id="se-notes" rows="3" style="resize:vertical;font-family:inherit">${notes}</textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmEditStatEntry('${entryId}','${monthId}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('se-username')?.focus(), 50);
+}
+
+async function confirmEditStatEntry(entryId, monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (!month || !entry) return;
+  const username = document.getElementById('se-username')?.value.trim() || entry.username;
+  const notes    = document.getElementById('se-notes')?.value || '';
+  const newValues = { ...entry.values, __notes__: notes };
+  (month.columns || []).forEach(c => {
+    const el = document.getElementById(`se-col-${c.id}`);
+    if (el) newValues[c.id] = c.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+  });
+  entry.username = username;
+  entry.values   = newValues;
+  month.entries = [...month.entries].sort((a, b) => a.username.localeCompare(b.username));
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, username, values: newValues });
+}
+
+function openRenameStatColumnModal(colId, monthId, currentName) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Rename Column</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Column Name</label>
+        <input type="text" class="form-input" id="rename-col-input" value="${currentName}" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmRenameStatColumn('${colId}','${monthId}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => { const i = document.getElementById('rename-col-input'); if (i) { i.focus(); i.select(); } }, 50);
+}
+
+async function confirmRenameStatColumn(colId, monthId) {
+  const name = document.getElementById('rename-col-input')?.value.trim();
+  if (!name) return;
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  month.columns = month.columns.map(c => c.id === colId ? { ...c, name } : c);
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
 }
 
 function statSelectMonth(monthId) {
@@ -1151,6 +1252,12 @@ function renderView() {
   };
   wrap.innerHTML = (views[state.view] || renderOverview)();
   afterRender();
+  // Mirror statistics updates into stats portal if active
+  const statsMain = document.getElementById('stats-main');
+  if (statsMain && statState.activeView === 'statistics') {
+    statsMain.innerHTML = renderStatistics();
+    setTimeout(initCharts, 0);
+  }
 }
 
 function afterRender() {
@@ -1860,11 +1967,12 @@ function renderInvoices() {
 // ══════════════════════════════════════════════════
 
 function renderMembers() {
+  const isAdmin = STATS_ADMIN_EMAILS.has(getStoredSession()?.email || '');
   const cards = state.members.map(m => `
     <div class="member-card">
       <div class="member-card-actions">
-        <button class="icon-btn" data-action="edit-member" data-member-id="${m.id}" title="Edit member">${PENCIL_ICON}</button>
-        <button class="delete-btn member-delete-btn" data-action="delete-member" data-member-id="${m.id}" title="Remove member">×</button>
+        ${isAdmin ? `<button class="icon-btn" data-action="edit-member" data-member-id="${m.id}" title="Edit member">${PENCIL_ICON}</button>
+        <button class="delete-btn member-delete-btn" data-action="delete-member" data-member-id="${m.id}" title="Remove member">×</button>` : ''}
       </div>
       ${state.profiles[m.email]
         ? `<img src="${state.profiles[m.email]}" alt="${m.name}" class="member-avatar avatar-img" />`
@@ -1872,13 +1980,11 @@ function renderMembers() {
       <div class="member-name">${m.name}</div>
       <div class="member-role-pill">${m.role}</div>
       <div class="member-meta">
-        <div>${m.email}</div>
+        ${isAdmin ? `<div>${m.email}</div>` : ''}
         <div>Joined ${formatDateShort(m.joinDate)}</div>
       </div>
     </div>
   `).join('');
-
-  const isAdmin = getStoredSession()?.email === 'alverzalexander0@gmail.com';
   return `
     <div class="page-header">
       <div class="page-title-block">

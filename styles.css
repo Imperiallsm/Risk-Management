@@ -547,6 +547,12 @@ body {
 }
 .stat-col-header:hover .stat-col-del { display: block; }
 
+.stat-col-name {
+  cursor: pointer;
+  display: inline-block;
+}
+.stat-col-name:hover { text-decoration: underline; text-underline-offset: 2px; }
+
 .sidebar {
   position: fixed;
   left: 0; top: 0; bottom: 0;

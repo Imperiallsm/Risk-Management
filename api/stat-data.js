@@ -5,9 +5,10 @@ module.exports = async (req, res) => {
   if (req.method !== 'GET') return res.status(405).end();
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-  const [monthsRes, membersRes] = await Promise.all([
+  const [monthsRes, membersRes, chanRes] = await Promise.all([
     sb.from('stat_tracker_months').select('*, entries:stat_tracker_entries(*)').order('created_at'),
     sb.from('members').select('*').order('join_date'),
+    sb.from('stat_channels').select('*, charts:stat_charts(*)').order('created_at'),
   ]);
 
   const months = (monthsRes.data || []).map(m => ({
@@ -25,5 +26,14 @@ module.exports = async (req, res) => {
     access: m.access || 'directory', joinDate: m.join_date,
   }));
 
-  return res.status(200).json({ months, members });
+  const channels = (chanRes.data || []).map(c => ({
+    id: c.id,
+    name: c.name,
+    charts: (c.charts || []).map(ch => ({
+      id: ch.id, channelId: ch.channel_id, title: ch.title,
+      chartType: ch.chart_type, data: ch.data || [],
+    })),
+  }));
+
+  return res.status(200).json({ months, members, channels });
 };
