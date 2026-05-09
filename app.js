@@ -542,6 +542,7 @@ async function initStatsApp() {
   try {
     const data = await statApi('/api/stat-data', 'GET');
     state.members    = data.members  || [];
+    state.profiles   = data.profiles || {};
     statState.months = data.months   || [];
     state.channels   = data.channels || [];
     state.activeChannel = state.channels[0]?.id || null;
@@ -610,11 +611,17 @@ function renderStatsSidebar() {
     </div>
     <div class="stats-sidebar-foot">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <div class="team-avatar" style="width:26px;height:26px;min-width:26px;font-size:10px;background:${getAvatarColor(name)}">${getInitials(name)}</div>
+        ${state.profiles[userEmail]
+          ? `<img src="${state.profiles[userEmail]}" alt="${name}" style="width:26px;height:26px;min-width:26px;border-radius:50%;object-fit:cover;" />`
+          : `<div class="team-avatar" style="width:26px;height:26px;min-width:26px;font-size:10px;background:${getAvatarColor(name)}">${getInitials(name)}</div>`
+        }
         <div style="flex:1;min-width:0">
           <p style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</p>
           <p style="font-size:10px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${userEmail}</p>
         </div>
+        <button class="icon-btn" onclick="openStatsSettingsModal()" title="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
       </div>
       ${isAdmin ? `<button class="btn-ghost btn-sm" style="width:100%;margin-bottom:4px" onclick="switchToDirectoryPortal()">Switch to Directory</button>` : ''}
       <button class="btn-ghost btn-sm" style="width:100%" onclick="signOut()">Sign Out</button>
@@ -1161,6 +1168,54 @@ async function confirmStatsInvite() {
     closeModal();
     renderStatsMain();
   } catch (e) { console.error(e); }
+}
+
+function openStatsSettingsModal() {
+  const email  = statState.userEmail;
+  const member = state.members.find(m => m.email === email);
+  const name   = member?.name || email.split('@')[0];
+  const url    = state.profiles[email];
+
+  const avatarPreview = url
+    ? `<img src="${url}" alt="${name}" class="settings-avatar-img" />`
+    : `<div class="team-avatar settings-avatar-placeholder" style="background:${getAvatarColor(name)}">${getInitials(name)}</div>`;
+
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Settings</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-profile-row">
+        <div class="settings-avatar-wrap" id="settings-avatar-preview">${avatarPreview}</div>
+        <div class="settings-profile-info">
+          <p class="settings-profile-name">${name}</p>
+          <p class="settings-profile-email">${email}</p>
+          <button class="btn-ghost btn-sm" style="margin-top:10px" onclick="document.getElementById('stats-avatar-input').click()">Change Photo</button>
+          <input type="file" id="stats-avatar-input" accept="image/*" style="display:none" onchange="handleStatsAvatarUpload(this)" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="signOut()">Sign Out</button>
+      <button class="btn-ghost" onclick="closeModal()">Close</button>
+    </div>
+  `);
+}
+
+async function handleStatsAvatarUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const dataUrl = await resizeImage(file, 200);
+  const email   = statState.userEmail;
+
+  const preview = document.getElementById('settings-avatar-preview');
+  if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="Avatar" class="settings-avatar-img" />`;
+
+  state.profiles[email] = dataUrl;
+  renderStatsSidebarEl();
+
+  statApi('/api/profile', 'POST', { email, avatarUrl: dataUrl }).catch(console.error);
 }
 
 function switchToDirectoryPortal() {

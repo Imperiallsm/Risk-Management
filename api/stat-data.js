@@ -5,10 +5,11 @@ module.exports = async (req, res) => {
   if (req.method !== 'GET') return res.status(405).end();
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-  const [monthsRes, membersRes, chanRes] = await Promise.all([
+  const [monthsRes, membersRes, chanRes, profRes] = await Promise.all([
     sb.from('stat_tracker_months').select('*, entries:stat_tracker_entries(*)').order('created_at'),
     sb.from('members').select('*').order('join_date'),
     sb.from('stat_channels').select('*, charts:stat_charts(*)').order('created_at'),
+    sb.from('profiles').select('*'),
   ]);
 
   const months = (monthsRes.data || []).map(m => ({
@@ -35,5 +36,8 @@ module.exports = async (req, res) => {
     })),
   }));
 
-  return res.status(200).json({ months, members, channels });
+  const profiles = {};
+  (profRes.data || []).forEach(p => { profiles[p.email] = p.avatar_url; });
+
+  return res.status(200).json({ months, members, channels, profiles });
 };
