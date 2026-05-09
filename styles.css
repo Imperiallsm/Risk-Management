@@ -556,18 +556,29 @@ body {
 /* Stat tracker dropdown cells */
 td:has(.stat-dropdown-cell) { text-align: center; }
 .stat-dropdown-cell {
-  border: none;
-  background: transparent;
+  border: 1px solid transparent;
+  background: var(--surface);
+  color: var(--text-2);
   font-size: 12px;
-  font-weight: 600;
-  padding: 2px 6px;
+  font-weight: 500;
+  padding: 3px 6px;
   border-radius: 4px;
   cursor: pointer;
   outline: none;
   width: 100%;
   text-align: center;
 }
-.stat-dropdown-cell:hover { background: var(--surface); }
+.stat-dropdown-cell:hover { border-color: var(--border-2); }
+.stat-dropdown-cell:focus { border-color: var(--border-2); outline: none; }
+
+/* When a value is selected, tinted classes override background/color */
+.rank-participant,  .rank-experienced, .rank-trusted,
+.rank-trial-mod,   .rank-moderator,
+.halfway-completed,.halfway-failed,
+.obs-very-positive,.obs-positive,.obs-neutral,
+.obs-negative,     .obs-very-negative,
+.status-promoted,  .status-demoted,
+.status-resigned,  .status-extended { border-color: transparent; }
 
 /* Prev Rank colours — light mode */
 .rank-participant  { color: #16a34a; background: rgba(22,163,74,0.12); }
