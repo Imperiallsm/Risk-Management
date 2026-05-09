@@ -746,13 +746,16 @@ function handleStatsClick(e) {
       const save = () => {
         const rawVal = input.value.trim();
         const val = colType === 'number' ? (parseFloat(rawVal) || 0) : rawVal;
-        el.textContent = val;
         const month = statState.months.find(m => m.id === monthId);
         const entry = month?.entries.find(e => e.id === entryId);
         if (entry) {
           entry.values = { ...entry.values, [colId]: val };
           statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, values: entry.values });
         }
+        const col = month?.columns.find(c => c.id === colId);
+        const threshCls = col ? getThresholdClass(col, val) : '';
+        el.className = `tracker-num tracker-editable${threshCls ? ' ' + threshCls : ''}`;
+        el.textContent = val;
       };
       input.addEventListener('blur', save);
       input.addEventListener('keydown', ev => {
