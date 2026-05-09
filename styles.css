@@ -553,6 +553,33 @@ body {
 }
 .stat-col-name:hover { text-decoration: underline; text-underline-offset: 2px; }
 
+/* Column dividers */
+.stat-col-dividers th,
+.stat-col-dividers td { border-right: 1px solid var(--border); }
+.stat-col-dividers th:last-child,
+.stat-col-dividers td:last-child { border-right: none; }
+
+/* Threshold cell highlights */
+.thresh-red    { background: rgba(239,68,68,0.15)  !important; color: #f87171 !important; font-weight:600; }
+.thresh-orange { background: rgba(251,146,60,0.15) !important; color: #fb923c !important; font-weight:600; }
+.thresh-yellow { background: rgba(234,179,8,0.15)  !important; color: #eab308 !important; font-weight:600; }
+.thresh-green  { background: rgba(74,222,128,0.12) !important; color: #4ade80 !important; font-weight:600; }
+.thresh-blue   { background: rgba(96,165,250,0.12) !important; color: #60a5fa !important; font-weight:600; }
+
+/* Value settings modal */
+.value-settings-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.value-settings-row:last-child { border-bottom: none; }
+.value-settings-col-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.value-settings-fields { padding-left: 4px; }
+
 /* Stat tracker dropdown cells */
 td:has(.stat-dropdown-cell) { text-align: center; }
 .stat-dropdown-cell {

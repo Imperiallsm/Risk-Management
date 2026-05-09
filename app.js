@@ -860,6 +860,7 @@ function renderStatsMain() {
         <div class="stats-tracker-actions">
           <button class="btn-ghost btn-sm" onclick="openDuplicateMonthModal('${activeMonth.id}','${activeMonth.name.replace(/'/g,"\\'")}')">Duplicate</button>
           <button class="btn-ghost btn-sm" onclick="openAddStatColumnModal('${activeMonth.id}')">+ Column</button>
+          <button class="btn-ghost btn-sm" onclick="openValueSettingsModal('${activeMonth.id}')">Value Settings</button>
           <button class="btn-primary btn-sm" onclick="openAddStatEntryModal('${activeMonth.id}')">+ Entry</button>
           <button class="btn-ghost btn-sm" style="color:var(--urgent)" onclick="deleteStatMonth('${activeMonth.id}')">Delete</button>
         </div>
@@ -956,7 +957,7 @@ function renderStatsTrackerTable(month) {
   const entries = month.entries || [];
   return `
     <div class="tracker-table-wrap" style="margin-top:0">
-      <table class="tracker-table">
+      <table class="tracker-table stat-col-dividers">
         <thead>
           <tr>
             <th style="text-align:left;min-width:130px">Username</th>
@@ -978,6 +979,94 @@ function renderStatsTrackerTable(month) {
       </table>
     </div>
   `;
+}
+
+function getThresholdClass(col, val) {
+  if (col.type !== 'number') return '';
+  const num = parseFloat(val);
+  if (isNaN(num)) return '';
+  const t = col.thresholds;
+  if (!t) return '';
+  if (t.below !== undefined && t.below !== '' && num < parseFloat(t.below)) return 'thresh-' + (t.belowColor || 'red');
+  if (t.above !== undefined && t.above !== '' && num > parseFloat(t.above)) return 'thresh-' + (t.aboveColor || 'green');
+  return '';
+}
+
+function openValueSettingsModal(monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  const numberCols = (month.columns || []).filter(c => c.type === 'number');
+  if (!numberCols.length) {
+    openModal(`
+      <div class="modal-header"><span class="modal-title">Value Settings</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="modal-body"><p style="color:var(--text-3);font-size:13px">Add number columns first to configure thresholds.</p></div>
+      <div class="modal-footer"><button class="btn-ghost" onclick="closeModal()">Close</button></div>
+    `);
+    return;
+  }
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Value Settings</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-3);font-size:13px;margin:0 0 16px">Set thresholds per column. Cells will be highlighted when the value is below or above the limit.</p>
+      ${numberCols.map(c => {
+        const t = c.thresholds || {};
+        return `
+          <div class="value-settings-row" data-col-id="${c.id}">
+            <div class="value-settings-col-name">${c.name}</div>
+            <div class="value-settings-fields">
+              <label class="form-label" style="font-size:11px;margin-bottom:2px">Below</label>
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+                <input type="number" class="form-input vs-below" placeholder="e.g. 5" value="${t.below !== undefined ? t.below : ''}" style="width:80px" />
+                <select class="form-select vs-below-color" style="width:100px">
+                  <option value="red"    ${(t.belowColor||'red')==='red'    ? 'selected':''}>Red</option>
+                  <option value="orange" ${(t.belowColor||'')==='orange'    ? 'selected':''}>Orange</option>
+                  <option value="yellow" ${(t.belowColor||'')==='yellow'    ? 'selected':''}>Yellow</option>
+                </select>
+              </div>
+              <label class="form-label" style="font-size:11px;margin-bottom:2px">Above</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="number" class="form-input vs-above" placeholder="e.g. 10" value="${t.above !== undefined ? t.above : ''}" style="width:80px" />
+                <select class="form-select vs-above-color" style="width:100px">
+                  <option value="green" ${(t.aboveColor||'green')==='green' ? 'selected':''}>Green</option>
+                  <option value="blue"  ${(t.aboveColor||'')==='blue'       ? 'selected':''}>Blue</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmValueSettings('${monthId}')">Save</button>
+    </div>
+  `);
+}
+
+function confirmValueSettings(monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  document.querySelectorAll('.value-settings-row').forEach(row => {
+    const colId = row.dataset.colId;
+    const col = month.columns.find(c => c.id === colId);
+    if (!col) return;
+    const below = row.querySelector('.vs-below').value;
+    const above = row.querySelector('.vs-above').value;
+    const belowColor = row.querySelector('.vs-below-color').value;
+    const aboveColor = row.querySelector('.vs-above-color').value;
+    col.thresholds = {
+      below: below !== '' ? parseFloat(below) : undefined,
+      belowColor,
+      above: above !== '' ? parseFloat(above) : undefined,
+      aboveColor,
+    };
+  });
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
 }
 
 function renderStatDropdownCell(c, entry, month) {
@@ -1005,7 +1094,8 @@ function renderStatEntry(entry, month, cols) {
       ${cols.map(c => {
         if (DROPDOWN_OPTION_MAP[c.type]) return renderStatDropdownCell(c, entry, month);
         const val = entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '');
-        return `<td class="tracker-num tracker-editable"
+        const threshCls = getThresholdClass(c, val);
+        return `<td class="tracker-num tracker-editable${threshCls ? ' ' + threshCls : ''}"
             data-stat-action="inline-value"
             data-entry-id="${entry.id}"
             data-col-id="${c.id}"
