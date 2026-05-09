@@ -3,6 +3,11 @@ const { createClient } = require('@supabase/supabase-js');
 
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return res.status(405).end();
+
+  const auth = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data: { user }, error: authErr } = await auth.auth.getUser(req.headers.authorization?.replace('Bearer ', ''));
+  if (authErr || !user) return res.status(401).end();
+
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   const [monthsRes, membersRes, chanRes, profRes] = await Promise.all([

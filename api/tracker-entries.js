@@ -25,6 +25,10 @@ function mapEntry(e) {
 }
 
 module.exports = async (req, res) => {
+  const auth = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data: { user }, error: authErr } = await auth.auth.getUser(req.headers.authorization?.replace('Bearer ', ''));
+  if (authErr || !user) return res.status(401).end();
+
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (req.method === 'POST') {
