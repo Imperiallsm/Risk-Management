@@ -48,6 +48,9 @@ const state = {
 
   profiles: {},
 
+  msReports: [],
+  msReportsLoaded: false,
+
   // UI flags
   addingTaskTo:  null,
   addingItemTo:  null,
@@ -57,6 +60,10 @@ const state = {
 // ══════════════════════════════════════════════════
 //  UTILITIES
 // ══════════════════════════════════════════════════
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 function getInitials(name) {
   return name.trim().split(/\s+/).map(w => w[0].toUpperCase()).slice(0, 2).join('');
@@ -580,7 +587,27 @@ const statState = {
   historyLoaded: false,
   exportMode: false,
   exportSelected: new Set(),
+  reports: [],
+  reportsLoaded: false,
+  sectionLeaders: {},
+  reportsBadge: 0,
 };
+
+function computeReportsBadge(reports) {
+  const email = statState.userEmail;
+  if (statState.isAdmin) {
+    return reports.filter(r => r.status === 'pending' && !r.read_by_admin).length;
+  }
+  return reports.filter(r => r.author_email === email && r.status !== 'pending' && !r.read_by_author).length;
+}
+
+function isCommissionLeader() {
+  return Object.values(statState.sectionLeaders).some(l => l.email === statState.userEmail);
+}
+
+function leaderSections() {
+  return STAT_SECTIONS.filter(s => statState.sectionLeaders[s.id]?.email === statState.userEmail);
+}
 
 async function statApi(path, method, body) {
   const session = getStoredSession();
@@ -600,12 +627,27 @@ async function initStatsApp() {
   statState.isAdmin = STATS_ADMIN_EMAILS.has(statState.userEmail);
 
   try {
-    const data = await statApi('/api/stat-data', 'GET');
+    const [data, leaders] = await Promise.all([
+      statApi('/api/stat-data', 'GET'),
+      statApi('/api/stat-section-leaders', 'GET'),
+    ]);
     state.members    = data.members  || [];
     state.profiles   = data.profiles || {};
     statState.months = data.months   || [];
     state.channels   = data.channels || [];
     state.activeChannel = state.channels[0]?.id || null;
+    statState.sectionLeaders = {};
+    (leaders || []).forEach(l => {
+      statState.sectionLeaders[l.section] = { email: l.leader_email, name: l.leader_name };
+    });
+  } catch (e) { console.error(e); }
+
+  // Load badge count
+  try {
+    const allReports = await statApi('/api/stat-reports', 'GET');
+    statState.reports = allReports;
+    statState.reportsLoaded = true;
+    statState.reportsBadge = computeReportsBadge(allReports);
   } catch (e) { console.error(e); }
 
   const sectionMonths = statState.months.filter(m => m.section === statState.activeSection);
@@ -654,11 +696,24 @@ function renderStatsSidebar() {
         </button>
         ${trackerExpanded ? `
           <div class="stats-nav-children">
-            ${STAT_SECTIONS.map(s => `
-              <button class="stats-nav-child ${activeSection === s.id && activeView === 'tracker' ? 'active' : ''}" onclick="statSelectSection('${s.id}')">
-                ${s.label}
-              </button>
-            `).join('')}
+            ${STAT_SECTIONS.map(s => {
+              const leader = statState.sectionLeaders[s.id];
+              const leaderAvatar = leader?.email
+                ? (state.profiles[leader.email]
+                    ? `<img src="${state.profiles[leader.email]}" class="section-leader-avatar avatar-img" />`
+                    : `<div class="section-leader-avatar" style="background:${getAvatarColor(leader.name || leader.email)}">${getInitials(leader.name || leader.email)}</div>`)
+                : '';
+              return `
+                <button class="stats-nav-child ${activeSection === s.id && activeView === 'tracker' ? 'active' : ''}" onclick="statSelectSection('${s.id}')">
+                  ${s.label}
+                </button>
+                <div class="section-leader-row">
+                  ${leaderAvatar}
+                  <span class="section-leader-name">${leader?.name || (isAdmin ? '<em style="color:var(--text-3);font-size:10px">No leader set</em>' : '')}</span>
+                  ${isAdmin ? `<button class="section-leader-edit" onclick="openAssignLeaderModal('${s.id}')" title="Assign leader">✎</button>` : ''}
+                </div>
+              `;
+            }).join('')}
           </div>
         ` : ''}
         <button class="stats-nav-item ${activeView === 'history' ? 'active' : ''}" onclick="statNavigate('history')">
@@ -668,6 +723,11 @@ function renderStatsSidebar() {
         <button class="stats-nav-item ${activeView === 'users' ? 'active' : ''}" onclick="statNavigate('users')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Users
+        </button>
+        <button class="stats-nav-item ${activeView === 'reports' ? 'active' : ''}" onclick="statNavigate('reports')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Reports
+          ${statState.reportsBadge > 0 ? `<span class="stat-nav-badge">${statState.reportsBadge}</span>` : ''}
         </button>
       </nav>
     </div>
@@ -847,6 +907,11 @@ function renderStatsMain() {
     return;
   }
 
+  if (statState.activeView === 'reports') {
+    renderStatsReportsView(el);
+    return;
+  }
+
   const section = STAT_SECTIONS.find(s => s.id === statState.activeSection);
   const sectionMonths = statState.months.filter(m => m.section === statState.activeSection);
   const activeMonth = sectionMonths.find(m => m.id === statState.activeMonth) || sectionMonths[0] || null;
@@ -980,6 +1045,239 @@ async function renderStatsHistoryView(el) {
 async function refreshStatHistory() {
   statState.historyLoaded = false;
   renderStatsMain();
+}
+
+// ── Reports View ──────────────────────────────────
+
+function renderStatsReportsView(el) {
+  const canSubmit = statState.isAdmin || isCommissionLeader();
+  const myReports = statState.isAdmin
+    ? statState.reports
+    : statState.reports.filter(r => r.author_email === statState.userEmail);
+
+  const statusBadge = s => {
+    const map = { pending: ['#ca8a04','#fef9c3'], approved: ['#16a34a','#dcfce7'], denied: ['#dc2626','#fff1f2'] };
+    const [fg, bg] = map[s] || ['var(--text-3)','var(--surface)'];
+    return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bg};color:${fg};text-transform:uppercase">${s}</span>`;
+  };
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div class="page-title-block">
+        <h1 class="page-title">Reports</h1>
+        <p class="page-date">${statState.isAdmin ? 'All incoming reports' : 'Your submitted reports'}</p>
+      </div>
+      ${canSubmit ? `<button class="btn-primary" onclick="openSubmitReportModal()">+ New Report</button>` : ''}
+    </div>
+    ${!canSubmit ? `<div class="empty-state"><p class="empty-state-text" style="font-size:13px">You have not been assigned as a Commission Leader for any section.</p></div>` : ''}
+    ${myReports.length === 0 && canSubmit ? `<p style="color:var(--text-3);font-size:13px;margin-top:8px">No reports yet.</p>` : ''}
+    <div class="report-card-list">
+      ${myReports.map(r => {
+        const sectionLabel = STAT_SECTIONS.find(s => s.id === r.section)?.label || r.section;
+        const date = new Date(r.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        const isUnread = statState.isAdmin ? (!r.read_by_admin && r.status === 'pending') : (r.status !== 'pending' && !r.read_by_author);
+        return `
+          <div class="report-card ${isUnread ? 'report-card-unread' : ''}" onclick="openViewReportModal('${r.id}')">
+            <div class="report-card-top">
+              <div style="display:flex;align-items:center;gap:8px">
+                ${statusBadge(r.status)}
+                <span style="font-size:11px;color:var(--text-3)">${sectionLabel}</span>
+                ${isUnread ? `<span class="report-unread-dot"></span>` : ''}
+              </div>
+              <span style="font-size:11px;color:var(--text-3)">${date}</span>
+            </div>
+            <div class="report-card-title">${r.title}</div>
+            <div class="report-card-author">By ${r.author_name || r.author_email}</div>
+            ${r.admin_reply ? `<div class="report-card-reply">Reply: ${r.admin_reply.slice(0,80)}${r.admin_reply.length>80?'…':''}</div>` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function openSubmitReportModal() {
+  const sections = statState.isAdmin ? STAT_SECTIONS : leaderSections();
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">New Report</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Section</label>
+        <select class="form-select" id="report-section">
+          ${sections.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Title</label>
+        <input type="text" class="form-input" id="report-title" placeholder="Brief summary…" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Report</label>
+        <textarea class="form-input" id="report-body" rows="8" placeholder="Write your full report here…" style="resize:vertical;font-family:inherit"></textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Attachment <span style="color:var(--text-3);font-size:11px">(optional)</span></label>
+        <input type="file" id="report-file" class="form-input" style="padding:6px" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" id="report-submit-btn" onclick="confirmSubmitReport()">Submit Report</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('report-title')?.focus(), 50);
+}
+
+async function confirmSubmitReport() {
+  const title   = document.getElementById('report-title')?.value.trim();
+  const body    = document.getElementById('report-body')?.value.trim();
+  const section = document.getElementById('report-section')?.value;
+  const fileEl  = document.getElementById('report-file');
+  if (!title) { document.getElementById('report-title').style.borderColor = 'var(--urgent)'; return; }
+  if (!body)  { document.getElementById('report-body').style.borderColor  = 'var(--urgent)'; return; }
+
+  const btn = document.getElementById('report-submit-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  let fileUrl = '', fileName = '';
+  if (fileEl?.files?.length) {
+    const file = fileEl.files[0];
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      const up = await statApi('/api/stat-report-upload', 'POST', { base64, name: file.name, type: file.type });
+      fileUrl  = up.url;
+      fileName = up.name;
+    } catch (e) { console.error('Upload failed', e); }
+  }
+
+  const member = state.members.find(m => m.email === statState.userEmail);
+  const authorName = member?.name || statState.userEmail.split('@')[0];
+  try {
+    const report = await statApi('/api/stat-reports', 'POST', {
+      section, title, body, fileUrl, fileName,
+      authorEmail: statState.userEmail, authorName,
+    });
+    statState.reports = [report, ...statState.reports];
+    statState.reportsBadge = computeReportsBadge(statState.reports);
+    closeModal();
+    renderStatsSidebarEl();
+    renderStatsMain();
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false; btn.textContent = 'Submit Report';
+  }
+}
+
+function openViewReportModal(reportId) {
+  const r = statState.reports.find(x => x.id === reportId);
+  if (!r) return;
+
+  // Mark as read
+  if (statState.isAdmin && !r.read_by_admin) {
+    r.read_by_admin = true;
+    statState.reportsBadge = computeReportsBadge(statState.reports);
+    statApi('/api/stat-reports', 'PATCH', { id: r.id, readByAdmin: true });
+    renderStatsSidebarEl();
+  } else if (!statState.isAdmin && r.status !== 'pending' && !r.read_by_author) {
+    r.read_by_author = true;
+    statState.reportsBadge = computeReportsBadge(statState.reports);
+    statApi('/api/stat-reports', 'PATCH', { id: r.id, readByAuthor: true });
+    renderStatsSidebarEl();
+  }
+
+  const sectionLabel = STAT_SECTIONS.find(s => s.id === r.section)?.label || r.section;
+  const date = new Date(r.created_at).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+  const statusColor = { pending: '#ca8a04', approved: '#16a34a', denied: '#dc2626' }[r.status] || 'var(--text-3)';
+
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">${r.title}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;background:${statusColor}20;color:${statusColor};text-transform:uppercase">${r.status}</span>
+        <span style="font-size:12px;color:var(--text-3)">${sectionLabel} · ${date}</span>
+        <span style="font-size:12px;color:var(--text-3)">By ${r.author_name || r.author_email}</span>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:16px;white-space:pre-wrap;font-size:13px;line-height:1.7;max-height:300px;overflow-y:auto">${r.body}</div>
+      ${r.file_url ? `<div style="margin-bottom:16px"><a href="${r.file_url}" target="_blank" rel="noopener" class="stat-entry-link">📎 ${r.file_name || 'Attachment'}</a></div>` : ''}
+      ${r.admin_reply ? `
+        <div style="border-left:3px solid var(--border-2);padding:10px 14px;margin-bottom:16px;background:var(--surface);border-radius:0 var(--radius) var(--radius) 0">
+          <p style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:6px">ADMIN REPLY</p>
+          <p style="font-size:13px;color:var(--text);white-space:pre-wrap">${r.admin_reply}</p>
+        </div>
+      ` : ''}
+      ${statState.isAdmin && r.status === 'pending' ? `
+        <div class="form-row">
+          <label class="form-label">Reply <span style="color:var(--text-3);font-size:11px">(optional)</span></label>
+          <textarea class="form-input" id="admin-reply-input" rows="4" placeholder="Add a reply to the author…" style="resize:vertical;font-family:inherit"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn-primary" style="background:#16a34a;border-color:#16a34a" onclick="resolveReport('${r.id}','approved')">✓ Approve</button>
+          <button class="btn-primary" style="background:#dc2626;border-color:#dc2626" onclick="resolveReport('${r.id}','denied')">✕ Deny</button>
+        </div>
+      ` : ''}
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Close</button>
+    </div>
+  `);
+}
+
+async function resolveReport(reportId, status) {
+  const reply = document.getElementById('admin-reply-input')?.value.trim() || '';
+  const r = statState.reports.find(x => x.id === reportId);
+  if (!r) return;
+  r.status = status;
+  r.admin_reply = reply;
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-reports', 'PATCH', { id: reportId, status, adminReply: reply });
+  logStatHistory(status === 'approved' ? 'approved' : 'denied', 'report', r.title, '', r.section);
+}
+
+function openAssignLeaderModal(sectionId) {
+  const section = STAT_SECTIONS.find(s => s.id === sectionId);
+  const msMembers = state.members.filter(m => m.access === 'stats' || m.access === 'both');
+  const current = statState.sectionLeaders[sectionId];
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Commission Leader — ${section?.label}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Assign Member</label>
+        <select class="form-select" id="leader-select">
+          <option value="">— None —</option>
+          ${msMembers.map(m => `<option value="${m.email}" data-name="${m.name}" ${current?.email === m.email ? 'selected' : ''}>${m.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmAssignLeader('${sectionId}')">Save</button>
+    </div>
+  `);
+}
+
+async function confirmAssignLeader(sectionId) {
+  const sel = document.getElementById('leader-select');
+  const leaderEmail = sel.value;
+  const leaderName  = sel.options[sel.selectedIndex]?.dataset.name || '';
+  statState.sectionLeaders[sectionId] = { email: leaderEmail, name: leaderName };
+  closeModal();
+  renderStatsSidebarEl();
+  statApi('/api/stat-section-leaders', 'POST', { section: sectionId, leaderEmail, leaderName });
 }
 
 function enterExportMode() {
@@ -1759,6 +2057,7 @@ function navigate(view, skipAnim) {
   state.view = view;
   state.addingTaskTo = null;
   state.addingItemTo = null;
+  if (view === 'projects' && !state.msReportsLoaded) loadMsReports();
 
   // Update nav active state
   document.querySelectorAll('.nav-item').forEach(el => {
@@ -2216,21 +2515,92 @@ function getRecentTasks(n) {
 //  PROJECTS PAGE
 // ══════════════════════════════════════════════════
 
+async function loadMsReports() {
+  try {
+    const data = await api('/api/stat-reports');
+    state.msReports = data || [];
+    state.msReportsLoaded = true;
+    if (state.view === 'projects') renderView();
+  } catch (e) { state.msReportsLoaded = true; }
+}
+
+async function dirResolveReport(reportId, status) {
+  const card = document.querySelector(`[data-report-id="${reportId}"]`);
+  const replyEl = document.getElementById(`dir-reply-${reportId}`);
+  const reply = replyEl ? replyEl.value.trim() : '';
+  const body = { id: reportId, status };
+  if (reply) body.adminReply = reply;
+  body.readByAdmin = true;
+  try {
+    await api('/api/stat-reports', 'PATCH', body);
+    const r = state.msReports.find(x => x.id === reportId);
+    if (r) { r.status = status; if (reply) r.admin_reply = reply; r.read_by_admin = true; }
+    if (card) {
+      const statusEl = card.querySelector('.report-card-status');
+      if (statusEl) {
+        statusEl.className = 'report-card-status report-status-' + status;
+        statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+      }
+      const actRow = card.querySelector('.report-action-row');
+      if (actRow) actRow.remove();
+      const replyArea = card.querySelector('.report-reply-area');
+      if (replyArea) replyArea.remove();
+      card.classList.remove('report-card-unread');
+    }
+  } catch (e) { alert('Failed to update report.'); }
+}
+
 function renderProjects() {
+  const myEmail = getStoredSession()?.email || '';
+  const isAdmin = state.members.find(m => m.email === myEmail)?.role === 'admin';
+
+  const msReportsSection = isAdmin ? (() => {
+    if (!state.msReportsLoaded) return '<p class="text-muted" style="margin-bottom:20px">Loading MS reports…</p>';
+    if (!state.msReports.length) return '<p class="text-muted" style="margin-bottom:20px">No MS reports yet.</p>';
+    const cards = state.msReports.map(r => {
+      const unread = !r.read_by_admin && r.status === 'pending';
+      const statusClass = `report-status-${r.status}`;
+      const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
+      const date = new Date(r.created_at).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+      const replyArea = r.status === 'pending' ? `
+        <textarea class="report-reply-area" id="dir-reply-${r.id}" placeholder="Optional reply message…"></textarea>
+        <div class="report-action-row">
+          <button class="btn-approve" onclick="dirResolveReport('${r.id}','approved')">Approve</button>
+          <button class="btn-deny" onclick="dirResolveReport('${r.id}','denied')">Deny</button>
+        </div>` : (r.admin_reply ? `<div class="report-card-reply"><strong>Reply:</strong> ${escHtml(r.admin_reply)}</div>` : '');
+      const fileLink = r.file_url ? `<a class="report-view-file" href="${r.file_url}" target="_blank">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        ${escHtml(r.file_name || 'Attachment')}</a>` : '';
+      return `<div class="report-card ${unread ? 'report-card-unread' : ''}" data-report-id="${r.id}">
+        <div class="report-card-top">
+          ${unread ? '<span class="report-unread-dot"></span>' : ''}
+          <span class="report-card-title">${escHtml(r.title)}</span>
+          <span class="report-card-status ${statusClass}">${statusLabel}</span>
+        </div>
+        <div class="report-card-meta">${escHtml(r.author_name || r.author_email)} &middot; Section: ${escHtml(r.section)} &middot; ${date}</div>
+        <div class="report-view-body">${escHtml(r.body)}</div>
+        ${fileLink}
+        ${replyArea}
+      </div>`;
+    }).join('');
+    return `<div class="reports-list" style="margin-bottom:28px">${cards}</div>`;
+  })() : '';
+
   return `
     <div class="page-header">
       <div class="page-title-block">
         <h1 class="page-title">Reports</h1>
       </div>
-      <button class="btn-primary" data-action="new-project">
+      ${isAdmin ? '' : `<button class="btn-primary" data-action="new-project">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Project
-      </button>
+      </button>`}
     </div>
-    ${state.projects.length === 0
+    ${isAdmin ? `<h3 style="font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:12px">MS Commission Reports</h3>${msReportsSection}` : ''}
+    ${!isAdmin ? (state.projects.length === 0
       ? `<div class="empty-state"><div class="empty-state-icon">📁</div><p class="empty-state-text">No projects yet. Create one to get started.</p></div>`
       : state.projects.map(renderProjectGroup).join('')
-    }
+    ) : ''}
   `;
 }
 
