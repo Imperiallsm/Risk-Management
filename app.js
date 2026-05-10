@@ -696,24 +696,11 @@ function renderStatsSidebar() {
         </button>
         ${trackerExpanded ? `
           <div class="stats-nav-children">
-            ${STAT_SECTIONS.map(s => {
-              const leader = statState.sectionLeaders[s.id];
-              const leaderAvatar = leader?.email
-                ? (state.profiles[leader.email]
-                    ? `<img src="${state.profiles[leader.email]}" class="section-leader-avatar avatar-img" />`
-                    : `<div class="section-leader-avatar" style="background:${getAvatarColor(leader.name || leader.email)}">${getInitials(leader.name || leader.email)}</div>`)
-                : '';
-              return `
+            ${STAT_SECTIONS.map(s => `
                 <button class="stats-nav-child ${activeSection === s.id && activeView === 'tracker' ? 'active' : ''}" onclick="statSelectSection('${s.id}')">
                   ${s.label}
                 </button>
-                <div class="section-leader-row">
-                  ${leaderAvatar}
-                  <span class="section-leader-name">${leader?.name || (isAdmin ? '<em style="color:var(--text-3);font-size:10px">No leader set</em>' : '')}</span>
-                  ${isAdmin ? `<button class="section-leader-edit" onclick="openAssignLeaderModal('${s.id}')" title="Assign leader">✎</button>` : ''}
-                </div>
-              `;
-            }).join('')}
+              `).join('')}
           </div>
         ` : ''}
         <button class="stats-nav-item ${activeView === 'history' ? 'active' : ''}" onclick="statNavigate('history')">
@@ -917,10 +904,23 @@ function renderStatsMain() {
   const activeMonth = sectionMonths.find(m => m.id === statState.activeMonth) || sectionMonths[0] || null;
   if (activeMonth && statState.activeMonth !== activeMonth.id) statState.activeMonth = activeMonth.id;
 
+  const leader = statState.sectionLeaders[statState.activeSection];
+  const leaderHtml = (() => {
+    const avatar = leader?.email && state.profiles[leader.email]
+      ? `<img src="${state.profiles[leader.email]}" class="section-leader-avatar" alt="${leader.name}" />`
+      : leader?.name
+        ? `<div class="section-leader-avatar-placeholder">${getInitials(leader.name)}</div>`
+        : '';
+    const name = leader?.name ? `<span class="section-leader-name">${leader.name}</span>` : `<span class="section-leader-name" style="font-style:italic">No leader set</span>`;
+    const editBtn = statState.isAdmin ? `<button class="section-leader-edit" onclick="openAssignLeaderModal('${statState.activeSection}')" title="Assign leader"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>` : '';
+    return `<div class="section-leader-row" style="margin-bottom:16px">${avatar}${name}${editBtn}</div>`;
+  })();
+
   el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <h2 style="font-size:18px;font-weight:600;color:var(--text)">${section?.label || 'Tracker'}</h2>
     </div>
+    ${leaderHtml}
     <div class="stats-tracker-header">
       <div class="stats-month-tabs">
         ${sectionMonths.map(m => `
