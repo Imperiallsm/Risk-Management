@@ -840,6 +840,10 @@ function handleStatsClick(e) {
       openRenameStatColumnModal(el.dataset.colId, el.dataset.monthId, el.dataset.colName);
       break;
     }
+    case 'edit-obs-text': {
+      openObsTextModal(el.dataset.entryId, el.dataset.colId, el.dataset.monthId);
+      break;
+    }
   }
 }
 
@@ -1416,10 +1420,16 @@ function renderStatsTrackerTable(month) {
           <tr>
             ${exporting ? `<th style="width:32px"></th>` : ''}
             <th style="text-align:left;min-width:130px">Username</th>
-            ${cols.map(c => `
+            ${cols.map((c, i) => `
               <th class="stat-col-header">
-                <span class="stat-col-name" data-stat-action="rename-col" data-col-id="${c.id}" data-month-id="${month.id}" data-col-name="${c.name.replace(/"/g,'&quot;')}" title="Click to rename">${c.name}</span>
-                <button class="stat-col-del" data-stat-action="delete-col" data-col-id="${c.id}" data-month-id="${month.id}">×</button>
+                <div class="stat-col-header-inner">
+                  <span class="stat-col-name" data-stat-action="rename-col" data-col-id="${c.id}" data-month-id="${month.id}" data-col-name="${c.name.replace(/"/g,'&quot;')}" title="Click to rename">${c.name}</span>
+                  <div class="stat-col-actions">
+                    <button class="stat-col-move" title="Move left" onclick="moveStatColumn('${month.id}','${c.id}',-1)" ${i === 0 ? 'disabled' : ''}>‹</button>
+                    <button class="stat-col-move" title="Move right" onclick="moveStatColumn('${month.id}','${c.id}',1)" ${i === cols.length - 1 ? 'disabled' : ''}>›</button>
+                    <button class="stat-col-del" data-stat-action="delete-col" data-col-id="${c.id}" data-month-id="${month.id}">×</button>
+                  </div>
+                </div>
               </th>
             `).join('')}
             <th style="width:80px"></th>
@@ -1553,6 +1563,17 @@ function renderStatEntry(entry, month, cols) {
       </td>
       ${cols.map(c => {
         if (DROPDOWN_OPTION_MAP[c.type]) return renderStatDropdownCell(c, entry, month);
+        if (c.type === 'obs-text') {
+          const v = entry.values[c.id] || {};
+          const pos = v.pos ?? 0, neg = v.neg ?? 0, neu = v.neu ?? 0;
+          return `<td class="obs-text-cell" data-stat-action="edit-obs-text" data-entry-id="${entry.id}" data-col-id="${c.id}" data-month-id="${month.id}" title="Click to edit">
+            <span class="obs-pos">${pos} Positive</span>
+            <span class="obs-sep">·</span>
+            <span class="obs-neg">${neg} Negative</span>
+            <span class="obs-sep">·</span>
+            <span class="obs-neu">${neu} Neutral</span>
+          </td>`;
+        }
         const val = entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '');
         const threshCls = getThresholdClass(c, val);
         return `<td class="tracker-num tracker-editable${threshCls ? ' ' + threshCls : ''}"
@@ -1633,6 +1654,17 @@ function openEditStatEntryModal(entryId, monthId) {
             </select>
           </div>`;
         }
+        if (c.type === 'obs-text') {
+          const v = entry.values[c.id] || {};
+          return `<div class="form-row">
+            <label class="form-label">${c.name}</label>
+            <div class="obs-text-inputs">
+              <div class="obs-text-row"><label class="obs-text-label obs-pos-label">Positive</label><input type="number" class="form-input obs-text-num" id="se-col-${c.id}-pos" min="0" value="${v.pos ?? 0}" /></div>
+              <div class="obs-text-row"><label class="obs-text-label obs-neg-label">Negative</label><input type="number" class="form-input obs-text-num" id="se-col-${c.id}-neg" min="0" value="${v.neg ?? 0}" /></div>
+              <div class="obs-text-row"><label class="obs-text-label obs-neu-label">Neutral</label><input type="number" class="form-input obs-text-num" id="se-col-${c.id}-neu" min="0" value="${v.neu ?? 0}" /></div>
+            </div>
+          </div>`;
+        }
         return `<div class="form-row">
           <label class="form-label">${c.name}</label>
           <input type="${c.type === 'number' ? 'number' : 'text'}" class="form-input" id="se-col-${c.id}" value="${entry.values[c.id] !== undefined ? entry.values[c.id] : (c.type === 'number' ? 0 : '')}" />
@@ -1660,8 +1692,15 @@ async function confirmEditStatEntry(entryId, monthId) {
   const link     = document.getElementById('se-link')?.value.trim() || '';
   const newValues = { ...entry.values, __notes__: notes, __link__: link };
   (month.columns || []).forEach(c => {
-    const el = document.getElementById(`se-col-${c.id}`);
-    if (el) newValues[c.id] = c.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+    if (c.type === 'obs-text') {
+      const pos = parseInt(document.getElementById(`se-col-${c.id}-pos`)?.value) || 0;
+      const neg = parseInt(document.getElementById(`se-col-${c.id}-neg`)?.value) || 0;
+      const neu = parseInt(document.getElementById(`se-col-${c.id}-neu`)?.value) || 0;
+      newValues[c.id] = { pos, neg, neu };
+    } else {
+      const el = document.getElementById(`se-col-${c.id}`);
+      if (el) newValues[c.id] = c.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+    }
   });
   const prevUsername = entry.username;
   entry.username = username;
@@ -1877,6 +1916,7 @@ function openAddStatColumnModal(monthId) {
           <option value="status">Status (dropdown)</option>
           <option value="halfway">Halfway (dropdown)</option>
           <option value="observations">Observations (dropdown)</option>
+          <option value="obs-text">Observations (Text)</option>
         </select>
       </div>
     </div>
@@ -1900,6 +1940,67 @@ async function confirmAddStatColumn(monthId) {
   renderStatsMain();
   statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
   logStatHistory('created', 'column', name, month.name, statState.activeSection, `Type: ${type}`);
+}
+
+function openObsTextModal(entryId, colId, monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  const col = month?.columns.find(c => c.id === colId);
+  if (!entry || !col) return;
+  const v = entry.values[colId] || {};
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">${col.name}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="obs-text-inputs">
+        <div class="obs-text-row">
+          <label class="obs-text-label obs-pos-label">Positive</label>
+          <input type="number" class="form-input obs-text-num" id="obs-pos" min="0" value="${v.pos ?? 0}" />
+        </div>
+        <div class="obs-text-row">
+          <label class="obs-text-label obs-neg-label">Negative</label>
+          <input type="number" class="form-input obs-text-num" id="obs-neg" min="0" value="${v.neg ?? 0}" />
+        </div>
+        <div class="obs-text-row">
+          <label class="obs-text-label obs-neu-label">Neutral</label>
+          <input type="number" class="form-input obs-text-num" id="obs-neu" min="0" value="${v.neu ?? 0}" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmObsText('${entryId}','${colId}','${monthId}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('obs-pos')?.focus(), 50);
+}
+
+async function confirmObsText(entryId, colId, monthId) {
+  const pos = parseInt(document.getElementById('obs-pos')?.value) || 0;
+  const neg = parseInt(document.getElementById('obs-neg')?.value) || 0;
+  const neu = parseInt(document.getElementById('obs-neu')?.value) || 0;
+  const month = statState.months.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  entry.values = { ...entry.values, [colId]: { pos, neg, neu } };
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, values: entry.values });
+}
+
+function moveStatColumn(monthId, colId, dir) {
+  const month = statState.months.find(m => m.id === monthId);
+  if (!month) return;
+  const cols = [...(month.columns || [])];
+  const idx = cols.findIndex(c => c.id === colId);
+  const target = idx + dir;
+  if (target < 0 || target >= cols.length) return;
+  [cols[idx], cols[target]] = [cols[target], cols[idx]];
+  month.columns = cols;
+  renderStatsMain();
+  statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
 }
 
 function openAddStatEntryModal(monthId) {
