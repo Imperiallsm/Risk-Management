@@ -1421,15 +1421,18 @@ function renderStatsTrackerTable(month) {
             ${exporting ? `<th style="width:32px"></th>` : ''}
             <th style="text-align:left;min-width:130px">Username</th>
             ${cols.map((c, i) => `
-              <th class="stat-col-header">
-                <div class="stat-col-header-inner">
-                  <span class="stat-col-name" data-stat-action="rename-col" data-col-id="${c.id}" data-month-id="${month.id}" data-col-name="${c.name.replace(/"/g,'&quot;')}" title="Click to rename">${c.name}</span>
-                  <div class="stat-col-actions">
-                    <button class="stat-col-move" title="Move left" onclick="moveStatColumn('${month.id}','${c.id}',-1)" ${i === 0 ? 'disabled' : ''}>‹</button>
-                    <button class="stat-col-move" title="Move right" onclick="moveStatColumn('${month.id}','${c.id}',1)" ${i === cols.length - 1 ? 'disabled' : ''}>›</button>
-                    <button class="stat-col-del" data-stat-action="delete-col" data-col-id="${c.id}" data-month-id="${month.id}">×</button>
-                  </div>
-                </div>
+              <th class="stat-col-header"
+                  draggable="true"
+                  data-col-id="${c.id}"
+                  data-col-idx="${i}"
+                  data-month-id="${month.id}"
+                  ondragstart="colDragStart(event)"
+                  ondragover="colDragOver(event)"
+                  ondragleave="colDragLeave(event)"
+                  ondrop="colDrop(event,'${month.id}')"
+                  ondragend="colDragEnd(event)">
+                <span class="stat-col-name" data-stat-action="rename-col" data-col-id="${c.id}" data-month-id="${month.id}" data-col-name="${c.name.replace(/"/g,'&quot;')}" title="Click to rename">${c.name}</span>
+                <button class="stat-col-del" data-stat-action="delete-col" data-col-id="${c.id}" data-month-id="${month.id}">×</button>
               </th>
             `).join('')}
             <th style="width:80px"></th>
@@ -1990,15 +1993,54 @@ async function confirmObsText(entryId, colId, monthId) {
   statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, values: entry.values });
 }
 
-function moveStatColumn(monthId, colId, dir) {
+let _dragColId = null;
+
+function colDragStart(e) {
+  _dragColId = e.currentTarget.dataset.colId;
+  e.currentTarget.classList.add('col-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function colDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const th = e.currentTarget;
+  if (th.dataset.colId === _dragColId) return;
+  const rect = th.getBoundingClientRect();
+  const half = rect.left + rect.width / 2;
+  th.classList.remove('col-drop-left', 'col-drop-right');
+  th.classList.add(e.clientX < half ? 'col-drop-left' : 'col-drop-right');
+}
+
+function colDragLeave(e) {
+  e.currentTarget.classList.remove('col-drop-left', 'col-drop-right');
+}
+
+function colDragEnd(e) {
+  e.currentTarget.classList.remove('col-dragging');
+  document.querySelectorAll('.col-drop-left, .col-drop-right').forEach(el => {
+    el.classList.remove('col-drop-left', 'col-drop-right');
+  });
+}
+
+function colDrop(e, monthId) {
+  e.preventDefault();
+  const targetTh = e.currentTarget;
+  targetTh.classList.remove('col-drop-left', 'col-drop-right');
+  if (!_dragColId || targetTh.dataset.colId === _dragColId) return;
   const month = statState.months.find(m => m.id === monthId);
   if (!month) return;
   const cols = [...(month.columns || [])];
-  const idx = cols.findIndex(c => c.id === colId);
-  const target = idx + dir;
-  if (target < 0 || target >= cols.length) return;
-  [cols[idx], cols[target]] = [cols[target], cols[idx]];
+  const fromIdx = cols.findIndex(c => c.id === _dragColId);
+  let toIdx = cols.findIndex(c => c.id === targetTh.dataset.colId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const rect = targetTh.getBoundingClientRect();
+  if (e.clientX >= rect.left + rect.width / 2) toIdx += 1;
+  if (toIdx > fromIdx) toIdx -= 1;
+  const [moved] = cols.splice(fromIdx, 1);
+  cols.splice(toIdx, 0, moved);
   month.columns = cols;
+  _dragColId = null;
   renderStatsMain();
   statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
 }

@@ -2455,33 +2455,12 @@ tr:hover .delete-btn,
 [data-theme="dark"] .trk-sel-demoted { background-color: rgba(113,113,122,0.12);color: #71717a; }
 [data-theme="dark"] .trk-sel-na      { background-color: rgba(161,161,170,0.10);color: #52525b; }
 
-/* ── Column header move buttons ── */
-.stat-col-header-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-.stat-col-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.stat-col-header:hover .stat-col-actions { opacity: 1; }
-.stat-col-move {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-3);
-  font-size: 14px;
-  line-height: 1;
-  padding: 1px 3px;
-  border-radius: 3px;
-}
-.stat-col-move:hover:not(:disabled) { background: var(--surface-2); color: var(--text-1); }
-.stat-col-move:disabled { opacity: 0.25; cursor: default; }
+/* ── Column drag-and-drop ── */
+.stat-col-header[draggable="true"] { cursor: grab; }
+.stat-col-header[draggable="true"]:active { cursor: grabbing; }
+.stat-col-header.col-dragging { opacity: 0.4; }
+.stat-col-header.col-drop-left  { box-shadow: inset 3px 0 0 #6366f1; }
+.stat-col-header.col-drop-right { box-shadow: inset -3px 0 0 #6366f1; }
 
 /* ── Observations (Text) cell ── */
 .obs-text-cell {
