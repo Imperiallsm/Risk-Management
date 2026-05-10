@@ -602,11 +602,11 @@ function computeReportsBadge(reports) {
 }
 
 function isCommissionLeader() {
-  return Object.values(statState.sectionLeaders).some(l => l.email === statState.userEmail);
+  return Object.values(statState.sectionLeaders).some(arr => arr.some(l => l.email === statState.userEmail));
 }
 
 function leaderSections() {
-  return STAT_SECTIONS.filter(s => statState.sectionLeaders[s.id]?.email === statState.userEmail);
+  return STAT_SECTIONS.filter(s => (statState.sectionLeaders[s.id] || []).some(l => l.email === statState.userEmail));
 }
 
 async function statApi(path, method, body) {
@@ -638,7 +638,8 @@ async function initStatsApp() {
     state.activeChannel = state.channels[0]?.id || null;
     statState.sectionLeaders = {};
     (leaders || []).forEach(l => {
-      statState.sectionLeaders[l.section] = { email: l.leader_email, name: l.leader_name };
+      if (!statState.sectionLeaders[l.section]) statState.sectionLeaders[l.section] = [];
+      statState.sectionLeaders[l.section].push({ id: l.id, email: l.leader_email, name: l.leader_name });
     });
   } catch (e) { console.error(e); }
 
@@ -904,16 +905,18 @@ function renderStatsMain() {
   const activeMonth = sectionMonths.find(m => m.id === statState.activeMonth) || sectionMonths[0] || null;
   if (activeMonth && statState.activeMonth !== activeMonth.id) statState.activeMonth = activeMonth.id;
 
-  const leader = statState.sectionLeaders[statState.activeSection];
+  const leaders = statState.sectionLeaders[statState.activeSection] || [];
   const leaderHtml = (() => {
-    const avatar = leader?.email && state.profiles[leader.email]
-      ? `<img src="${state.profiles[leader.email]}" class="section-leader-avatar" alt="${leader.name}" />`
-      : leader?.name
-        ? `<div class="section-leader-avatar-placeholder">${getInitials(leader.name)}</div>`
-        : '';
-    const name = leader?.name ? `<span class="section-leader-name">${leader.name}</span>` : `<span class="section-leader-name" style="font-style:italic">No leader set</span>`;
-    const editBtn = statState.isAdmin ? `<button class="section-leader-edit" onclick="openAssignLeaderModal('${statState.activeSection}')" title="Assign leader"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>` : '';
-    return `<div class="section-leader-row" style="margin-bottom:16px">${avatar}${name}${editBtn}</div>`;
+    const pills = leaders.map(l => {
+      const avatar = state.profiles[l.email]
+        ? `<img src="${state.profiles[l.email]}" class="section-leader-avatar" alt="${l.name}" />`
+        : `<div class="section-leader-avatar-placeholder">${getInitials(l.name || l.email)}</div>`;
+      const removeBtn = statState.isAdmin ? `<button class="section-leader-remove" onclick="removeLeader('${statState.activeSection}','${l.id}')" title="Remove">×</button>` : '';
+      return `<div class="section-leader-pill">${avatar}<span class="section-leader-name">${l.name || l.email}</span>${removeBtn}</div>`;
+    }).join('');
+    const addBtn = statState.isAdmin ? `<button class="section-leader-add" onclick="openAssignLeaderModal('${statState.activeSection}')" title="Add leader">+ Add Leader</button>` : '';
+    const empty = !leaders.length && !statState.isAdmin ? `<span style="font-size:12px;color:var(--text-3);font-style:italic">No leaders assigned</span>` : '';
+    return `<div class="section-leaders-wrap" style="margin-bottom:16px">${pills}${addBtn}${empty}</div>`;
   })();
 
   el.innerHTML = `
@@ -1247,25 +1250,25 @@ async function resolveReport(reportId, status) {
 
 function openAssignLeaderModal(sectionId) {
   const section = STAT_SECTIONS.find(s => s.id === sectionId);
-  const msMembers = state.members.filter(m => m.access === 'stats' || m.access === 'both');
-  const current = statState.sectionLeaders[sectionId];
+  const existing = statState.sectionLeaders[sectionId] || [];
+  const msMembers = state.members.filter(m => (m.access === 'stats' || m.access === 'both') && !existing.some(l => l.email === m.email));
   openModal(`
     <div class="modal-header">
-      <span class="modal-title">Commission Leader — ${section?.label}</span>
+      <span class="modal-title">Add Leader — ${section?.label}</span>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-row">
-        <label class="form-label">Assign Member</label>
+        <label class="form-label">Select Member</label>
         <select class="form-select" id="leader-select">
-          <option value="">— None —</option>
-          ${msMembers.map(m => `<option value="${m.email}" data-name="${m.name}" ${current?.email === m.email ? 'selected' : ''}>${m.name}</option>`).join('')}
+          <option value="">— Choose —</option>
+          ${msMembers.map(m => `<option value="${m.email}" data-name="${m.name}">${m.name}</option>`).join('')}
         </select>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn-primary" onclick="confirmAssignLeader('${sectionId}')">Save</button>
+      <button class="btn-primary" onclick="confirmAssignLeader('${sectionId}')">Add</button>
     </div>
   `);
 }
@@ -1273,11 +1276,23 @@ function openAssignLeaderModal(sectionId) {
 async function confirmAssignLeader(sectionId) {
   const sel = document.getElementById('leader-select');
   const leaderEmail = sel.value;
-  const leaderName  = sel.options[sel.selectedIndex]?.dataset.name || '';
-  statState.sectionLeaders[sectionId] = { email: leaderEmail, name: leaderName };
+  if (!leaderEmail) return;
+  const leaderName = sel.options[sel.selectedIndex]?.dataset.name || '';
   closeModal();
-  renderStatsSidebarEl();
-  statApi('/api/stat-section-leaders', 'POST', { section: sectionId, leaderEmail, leaderName });
+  try {
+    const row = await statApi('/api/stat-section-leaders', 'POST', { section: sectionId, leaderEmail, leaderName });
+    if (!statState.sectionLeaders[sectionId]) statState.sectionLeaders[sectionId] = [];
+    statState.sectionLeaders[sectionId].push({ id: row.id, email: leaderEmail, name: leaderName });
+    renderStatsMain();
+  } catch (e) { alert('Failed to add leader.'); }
+}
+
+async function removeLeader(sectionId, leaderId) {
+  try {
+    await statApi('/api/stat-section-leaders', 'DELETE', { id: leaderId });
+    statState.sectionLeaders[sectionId] = (statState.sectionLeaders[sectionId] || []).filter(l => l.id !== leaderId);
+    renderStatsMain();
+  } catch (e) { alert('Failed to remove leader.'); }
 }
 
 function enterExportMode() {

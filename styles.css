@@ -2472,13 +2472,21 @@ tr:hover .delete-btn,
   line-height: 1;
 }
 
-/* ── Commission leader row under tracker section ── */
-.section-leader-row {
+/* ── Commission leaders row under tracker section ── */
+.section-leaders-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.section-leader-pill {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 4px 12px 8px 12px;
-  margin-top: -2px;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 10px 3px 4px;
 }
 .section-leader-avatar {
   width: 22px;
@@ -2486,13 +2494,13 @@ tr:hover .delete-btn,
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--surface-2);
 }
 .section-leader-avatar-placeholder {
   width: 22px;
   height: 22px;
   border-radius: 50%;
   background: var(--surface-2);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2503,14 +2511,33 @@ tr:hover .delete-btn,
   text-transform: uppercase;
 }
 .section-leader-name {
-  font-size: 11px;
-  color: var(--text-3);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
   white-space: nowrap;
 }
+.section-leader-remove {
+  background: none;
+  border: none;
+  padding: 0 0 0 4px;
+  cursor: pointer;
+  color: var(--text-3);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.5;
+}
+.section-leader-remove:hover { opacity: 1; color: #ef4444; }
+.section-leader-add {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 12px;
+  color: var(--text-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.section-leader-add:hover { border-color: var(--border-2); color: var(--text-2); background: var(--surface-2); }
 .section-leader-edit {
   background: none;
   border: none;

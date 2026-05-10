@@ -16,9 +16,18 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     const { section, leaderEmail, leaderName } = req.body || {};
-    if (!section) return res.status(400).json({ error: 'section required' });
-    const { error } = await sb.from('stat_section_leaders')
-      .upsert({ section, leader_email: leaderEmail || '', leader_name: leaderName || '' }, { onConflict: 'section' });
+    if (!section || !leaderEmail) return res.status(400).json({ error: 'section and leaderEmail required' });
+    const { data, error } = await sb.from('stat_section_leaders')
+      .upsert({ section, leader_email: leaderEmail, leader_name: leaderName || '' }, { onConflict: 'section,leader_email' })
+      .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const { error } = await sb.from('stat_section_leaders').delete().eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ success: true });
   }
