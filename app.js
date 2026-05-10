@@ -1781,7 +1781,8 @@ function avatarEl(name, email, size = 28) {
 function renderTeamList() {
   const el = document.getElementById('team-list');
   if (!el) return;
-  el.innerHTML = state.members.map(m => `
+  const directoryMembers = state.members.filter(m => m.access === 'directory' || m.access === 'both');
+  el.innerHTML = directoryMembers.map(m => `
     <div class="team-member-row">
       ${avatarEl(m.name, m.email)}
       <span class="team-member-name">${m.name.split(' ')[0]}</span>
@@ -2177,7 +2178,7 @@ function renderProjects() {
   return `
     <div class="page-header">
       <div class="page-title-block">
-        <h1 class="page-title">Projects</h1>
+        <h1 class="page-title">Reports</h1>
       </div>
       <button class="btn-primary" data-action="new-project">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
