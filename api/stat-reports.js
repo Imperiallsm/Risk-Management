@@ -40,5 +40,20 @@ module.exports = async (req, res) => {
     return res.status(200).json({ success: true });
   }
 
+  if (req.method === 'DELETE') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'id required' });
+    // Fetch report to get file path before deleting
+    const { data: report } = await sb.from('stat_reports').select('file_url').eq('id', id).single();
+    if (report?.file_url) {
+      // Extract storage path from public URL
+      const match = report.file_url.match(/\/reports\/(.+)$/);
+      if (match) await sb.storage.from('reports').remove([match[1]]);
+    }
+    const { error } = await sb.from('stat_reports').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true });
+  }
+
   return res.status(405).end();
 };

@@ -1230,7 +1230,8 @@ function openViewReportModal(reportId) {
         </div>
       ` : ''}
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="justify-content:space-between">
+      ${statState.isAdmin ? `<button class="btn-ghost" style="color:#ef4444" onclick="deleteReport('${r.id}')">Delete</button>` : ''}
       <button class="btn-ghost" onclick="closeModal()">Close</button>
     </div>
   `);
@@ -1246,6 +1247,27 @@ async function resolveReport(reportId, status) {
   renderStatsMain();
   statApi('/api/stat-reports', 'PATCH', { id: reportId, status, adminReply: reply });
   logStatHistory(status === 'approved' ? 'approved' : 'denied', 'report', r.title, '', r.section);
+}
+
+async function deleteReport(reportId) {
+  if (!confirm('Delete this report? This also removes any attached file and cannot be undone.')) return;
+  closeModal();
+  try {
+    await statApi('/api/stat-reports', 'DELETE', { id: reportId });
+    statState.reports = statState.reports.filter(r => r.id !== reportId);
+    statState.reportsBadge = computeReportsBadge(statState.reports);
+    renderStatsSidebarEl();
+    renderStatsMain();
+  } catch (e) { alert('Failed to delete report.'); }
+}
+
+async function dirDeleteReport(reportId) {
+  if (!confirm('Delete this report? This also removes any attached file and cannot be undone.')) return;
+  try {
+    await api('/api/stat-reports', 'DELETE', { id: reportId });
+    state.msReports = state.msReports.filter(r => r.id !== reportId);
+    renderView();
+  } catch (e) { alert('Failed to delete report.'); }
 }
 
 function openAssignLeaderModal(sectionId) {
@@ -2589,6 +2611,7 @@ function renderProjects() {
       const fileLink = r.file_url ? `<a class="report-view-file" href="${escHtml(r.file_url)}" target="_blank">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         ${escHtml(r.file_name || 'Attachment')}</a>` : '';
+      const deleteBtn = isAdmin ? `<button class="btn-ghost btn-sm" style="color:#ef4444;margin-top:8px" onclick="dirDeleteReport('${r.id}')">Delete</button>` : '';
       return `<div class="report-card ${unread ? 'report-card-unread' : ''}" data-report-id="${r.id}">
         <div class="report-card-top">
           ${unread ? '<span class="report-unread-dot"></span>' : ''}
@@ -2599,6 +2622,7 @@ function renderProjects() {
         <div class="report-view-body">${escHtml(r.body)}</div>
         ${fileLink}
         ${replyArea}
+        ${deleteBtn}
       </div>`;
     }).join('') + '</div>';
   };
