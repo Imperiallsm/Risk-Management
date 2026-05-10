@@ -2517,7 +2517,10 @@ function getRecentTasks(n) {
 
 async function loadMsReports() {
   try {
-    const data = await api('/api/stat-reports');
+    const myEmail = getStoredSession()?.email || '';
+    const isAdmin = state.members.find(m => m.email === myEmail)?.role === 'admin';
+    const url = isAdmin ? '/api/stat-reports' : `/api/stat-reports?author=${encodeURIComponent(myEmail)}`;
+    const data = await api(url);
     state.msReports = data || [];
     state.msReportsLoaded = true;
     if (state.view === 'projects') renderView();
@@ -2554,21 +2557,21 @@ function renderProjects() {
   const myEmail = getStoredSession()?.email || '';
   const isAdmin = state.members.find(m => m.email === myEmail)?.role === 'admin';
 
-  const msReportsSection = isAdmin ? (() => {
-    if (!state.msReportsLoaded) return '<p class="text-muted" style="margin-bottom:20px">Loading MS reports…</p>';
-    if (!state.msReports.length) return '<p class="text-muted" style="margin-bottom:20px">No MS reports yet.</p>';
-    const cards = state.msReports.map(r => {
-      const unread = !r.read_by_admin && r.status === 'pending';
+  const buildReportCards = () => {
+    if (!state.msReportsLoaded) return '<p class="text-muted">Loading reports…</p>';
+    if (!state.msReports.length) return '<div class="empty-state"><p class="empty-state-text">No reports submitted yet.</p></div>';
+    return '<div class="reports-list">' + state.msReports.map(r => {
+      const unread = isAdmin ? (!r.read_by_admin && r.status === 'pending') : (!r.read_by_author && !!r.admin_reply);
       const statusClass = `report-status-${r.status}`;
       const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
       const date = new Date(r.created_at).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
-      const replyArea = r.status === 'pending' ? `
+      const replyArea = isAdmin && r.status === 'pending' ? `
         <textarea class="report-reply-area" id="dir-reply-${r.id}" placeholder="Optional reply message…"></textarea>
         <div class="report-action-row">
           <button class="btn-approve" onclick="dirResolveReport('${r.id}','approved')">Approve</button>
           <button class="btn-deny" onclick="dirResolveReport('${r.id}','denied')">Deny</button>
         </div>` : (r.admin_reply ? `<div class="report-card-reply"><strong>Reply:</strong> ${escHtml(r.admin_reply)}</div>` : '');
-      const fileLink = r.file_url ? `<a class="report-view-file" href="${r.file_url}" target="_blank">
+      const fileLink = r.file_url ? `<a class="report-view-file" href="${escHtml(r.file_url)}" target="_blank">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         ${escHtml(r.file_name || 'Attachment')}</a>` : '';
       return `<div class="report-card ${unread ? 'report-card-unread' : ''}" data-report-id="${r.id}">
@@ -2577,30 +2580,21 @@ function renderProjects() {
           <span class="report-card-title">${escHtml(r.title)}</span>
           <span class="report-card-status ${statusClass}">${statusLabel}</span>
         </div>
-        <div class="report-card-meta">${escHtml(r.author_name || r.author_email)} &middot; Section: ${escHtml(r.section)} &middot; ${date}</div>
+        <div class="report-card-meta">${isAdmin ? escHtml(r.author_name || r.author_email) + ' &middot; ' : ''}Section: ${escHtml(r.section)} &middot; ${date}</div>
         <div class="report-view-body">${escHtml(r.body)}</div>
         ${fileLink}
         ${replyArea}
       </div>`;
-    }).join('');
-    return `<div class="reports-list" style="margin-bottom:28px">${cards}</div>`;
-  })() : '';
+    }).join('') + '</div>';
+  };
 
   return `
     <div class="page-header">
       <div class="page-title-block">
         <h1 class="page-title">Reports</h1>
       </div>
-      ${isAdmin ? '' : `<button class="btn-primary" data-action="new-project">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        New Project
-      </button>`}
     </div>
-    ${isAdmin ? `<h3 style="font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:12px">MS Commission Reports</h3>${msReportsSection}` : ''}
-    ${!isAdmin ? (state.projects.length === 0
-      ? `<div class="empty-state"><div class="empty-state-icon">📁</div><p class="empty-state-text">No projects yet. Create one to get started.</p></div>`
-      : state.projects.map(renderProjectGroup).join('')
-    ) : ''}
+    ${buildReportCards()}
   `;
 }
 
