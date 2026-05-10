@@ -780,6 +780,10 @@ function handleStatsClick(e) {
       openDeleteStatColumnModal(el.dataset.colId, el.dataset.monthId);
       break;
     }
+    case 'stat-notes': {
+      openStatNotesModal(el.dataset.entryId, el.dataset.monthId);
+      break;
+    }
     case 'edit-entry': {
       openEditStatEntryModal(el.dataset.entryId, el.dataset.monthId);
       break;
@@ -1207,7 +1211,7 @@ function renderStatEntry(entry, month, cols) {
   const rowCls = STATUS_ROW_CLASS[statusVal] || '';
   const checked = statState.exportSelected.has(entry.id);
   return `
-    <tr class="${rowCls}" title="${notes ? 'Notes: ' + notes.replace(/"/g,'&quot;') : ''}">
+    <tr class="${rowCls}">
       ${statState.exportMode ? `<td style="text-align:center;width:32px"><input type="checkbox" class="export-checkbox" data-entry-id="${entry.id}" ${checked ? 'checked' : ''} onchange="toggleExportRow('${entry.id}',this.checked)" /></td>` : ''}
       <td>
         ${link ? `<a href="${link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" class="stat-entry-link">${entry.username}</a>` : entry.username}
@@ -1224,7 +1228,13 @@ function renderStatEntry(entry, month, cols) {
             data-month-id="${month.id}">${val}</td>`;
       }).join('')}
       <td style="text-align:right;white-space:nowrap">
-        ${notes ? `<span style="color:var(--text-3);font-size:11px;margin-right:2px" title="${notes.replace(/"/g,'&quot;')}">📝</span>` : ''}
+        <button class="tracker-notes-btn ${notes ? 'has-notes' : ''}"
+                data-stat-action="stat-notes"
+                data-entry-id="${entry.id}"
+                data-month-id="${month.id}"
+                title="${notes ? notes.replace(/"/g,'&quot;') : 'Add notes'}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </button>
         <button class="icon-btn" data-stat-action="edit-entry" data-entry-id="${entry.id}" data-month-id="${month.id}" title="Edit">${PENCIL_ICON}</button>
         <button class="icon-btn" data-stat-action="delete-entry" data-entry-id="${entry.id}" data-month-id="${month.id}" title="Delete">×</button>
       </td>
@@ -1360,6 +1370,38 @@ async function confirmRenameStatColumn(colId, monthId) {
   renderStatsMain();
   statApi('/api/stat-tracker-months', 'PATCH', { id: monthId, columns: month.columns });
   logStatHistory('edited', 'column', name, month.name, statState.activeSection, oldCol ? `Renamed from "${oldCol.name}"` : '');
+}
+
+function openStatNotesModal(entryId, monthId) {
+  const month = statState.months.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  const notes = entry.values.__notes__ || '';
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Notes — ${entry.username}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <textarea class="form-input" id="stat-notes-input" rows="5" placeholder="Add notes…" style="resize:vertical;font-family:inherit">${notes}</textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmStatNotes('${entryId}','${monthId}')">Save</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('stat-notes-input')?.focus(), 50);
+}
+
+async function confirmStatNotes(entryId, monthId) {
+  const notes = document.getElementById('stat-notes-input')?.value || '';
+  const month = statState.months.find(m => m.id === monthId);
+  const entry = month?.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  entry.values = { ...entry.values, __notes__: notes };
+  closeModal();
+  renderStatsMain();
+  statApi('/api/stat-tracker-entries', 'PATCH', { id: entryId, values: entry.values });
 }
 
 function openDeleteStatColumnModal(colId, monthId) {
